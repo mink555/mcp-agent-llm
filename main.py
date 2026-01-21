@@ -761,6 +761,7 @@ def run_benchmark(config):
     mode_tag = "QUICK" if config["samples_per_cat"] <= 2 else "FULL"
     model_short = _format_model_name_for_filename(config["model_name"])
     os.makedirs("results", exist_ok=True)
+    saved_files = []  # 개별 파일 경로 추적 (나중에 삭제용)
     
     for cat_idx, cat in enumerate(config["categories"], 1):
         cat_results = []
@@ -793,6 +794,7 @@ def run_benchmark(config):
             cat_df = pd.DataFrame(cat_results)
             report_path = f"results/BFCL_{mode_tag}_{model_short}_{cat}_Report_{timestamp}.xlsx"
             ExcelReporter.save(cat_df, report_path, config["model_name"], config)
+            saved_files.append(report_path)  # 나중에 삭제하기 위해 경로 저장
             
             cat_pass = len(cat_df[cat_df['결과'] == 'PASS'])
             cat_total = len(cat_df)
@@ -815,6 +817,17 @@ def run_benchmark(config):
     total_count = len(df)
     accuracy = (pass_count / total_count * 100) if total_count > 0 else 0
     
+    # 모든 카테고리가 완료되면 통합 파일 생성 및 개별 파일 삭제
+    final_report_path = f"results/BFCL_{mode_tag}_{model_short}_Report_{timestamp}.xlsx"
+    ExcelReporter.save(df, final_report_path, config["model_name"], config)
+    
+    # 개별 카테고리 파일 삭제
+    for file_path in saved_files:
+        try:
+            os.remove(file_path)
+        except Exception as e:
+            print(f"⚠️  파일 삭제 실패: {file_path} - {str(e)}")
+    
     print("\n" + "=" * 80)
     print("✅ 벤치마크 완료!")
     print("=" * 80)
@@ -822,10 +835,11 @@ def run_benchmark(config):
     print(f"✅ PASS: {pass_count}개 ({accuracy:.1f}%)")
     print(f"❌ FAIL: {total_count - pass_count}개")
     print(f"⏱️  소요 시간: {elapsed:.1f}초")
-    print(f"📁 저장 폴더: results/ ({len(config['categories'])}개 파일)")
+    print(f"💾 최종 저장: {final_report_path}")
+    print(f"🗑️  개별 파일 {len(saved_files)}개 정리 완료")
     print("=" * 80)
     
-    return f"results/BFCL_{mode_tag}_{model_short}_*_Report_{timestamp}.xlsx"
+    return final_report_path
 
 def main():
     """메인 실행 함수"""
