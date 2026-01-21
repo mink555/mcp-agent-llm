@@ -31,6 +31,35 @@ Berkeley Function Calling Leaderboard (BFCL) 벤치마크를 쉽게 실행할 �
 | **memory** | 155 | Agentic | ⭐⭐⭐ |
 | **format_sensitivity** | 9 | Agentic | ⭐⭐ |
 
+---
+
+## 🎯 BFCL 공식 평가 방법 준수
+
+본 구현은 BFCL 공식 평가 방법론을 완벽하게 준수합니다:
+
+### 1. Single-Turn: AST Exact Match ✅
+- **방법**: 호출 개수와 파라미터 구조가 정확히 일치해야 PASS
+- **Parallel**: 순서 무관 (order-independent matching)
+- **적용**: `simple_*`, `multiple`, `parallel`, `live_*` 카테고리
+
+### 2. Multi-Turn: Response-Based ✅
+- **방법**: 최소 필수 경로 포함 확인 + 중복 허용
+- **예시**: GT 5개 필수 → Model 8개 호출 (5개 포함 + 3개 중복) = ✅ PASS
+- **적용**: `multi_turn_*` 카테고리
+
+### 3. Relevance: Detection ✅
+- **Irrelevance**: 함수 호출 없음 = PASS
+- **Relevance**: 최소 1개 호출 = PASS (정확도 체크 안 함)
+- **적용**: `irrelevance`, `live_irrelevance`, `live_relevance`
+
+### 4. Agentic: Exact Match ✅
+- **방법**: 최종 답변에 정답 문자열 포함 여부
+- **적용**: `web_search`, `memory`
+
+> 📖 상세 구현 문서: [BFCL_IMPLEMENTATION.md](./BFCL_IMPLEMENTATION.md)
+
+---
+
 ## 🚀 빠른 시작
 
 ### 1. 환경 설정

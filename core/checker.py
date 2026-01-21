@@ -13,28 +13,55 @@ class BFCLChecker:
         all_model_calls: 대화 전체에서 발생한 모든 도구 호출 리스트
         ground_truth: 정답지
         last_content: 모델의 마지막 텍스트 응답
-        category: 테스트 카테고리 (parallel 감지용)
+        category: 테스트 카테고리
         """
-        if not ground_truth: return False, "❌ No Ground Truth"
+        # Ground truth가 None이거나 존재하지 않는 경우에만 에러
+        if ground_truth is None: 
+            return False, "❌ No Ground Truth"
         
-        # 1. Relevance Match (문자열 정답인 경우 - web_search 등)
+        # 1. Irrelevance detection: GT가 빈 리스트 → 함수 호출 없어야 함
+        if not ground_truth or (isinstance(ground_truth, list) and len(ground_truth) == 0):
+            if not all_model_calls:
+                return True, "✅ Irrelevance: No function calls (correct)"
+            else:
+                return False, f"❌ Irrelevance: Model called {len(all_model_calls)} functions (should be 0)"
+        
+        # 2. Agentic (web_search, memory): Exact-match (문자열 정답)
         if isinstance(ground_truth[0], str):
             # 호출 인자나 마지막 답변 내용 중 정답이 있는지 확인
             search_space = (str(all_model_calls) + " " + str(last_content)).lower()
             for gt in ground_truth:
                 if gt.lower() in search_space:
-                    return True, f"✅ Relevance Match: '{gt}' found"
+                    return True, f"✅ Exact Match: '{gt}' found"
             return False, f"❌ Answer mismatch (Expected: {ground_truth})"
 
-        # 2. AST Match (도구 호출 구조 검증)
+        # 3. AST Match (도구 호출 구조 검증)
         # GT 평탄화
         flattened_gt = []
         for gt in ground_truth:
             if isinstance(gt, list): flattened_gt.extend(gt)
             else: flattened_gt.append(gt)
 
-        # 도구 호출이 전혀 없는데 GT는 있는 경우
-        if not all_model_calls and flattened_gt:
+        # 3-1. GT가 빈 리스트인 경우 (이미 위에서 처리됨, 안전을 위한 체크)
+        if not flattened_gt:
+            if not all_model_calls:
+                return True, "✅ No function calls expected (correct)"
+            else:
+                return False, f"❌ Model called {len(all_model_calls)} functions (should be 0)"
+
+        # 2-2. Relevance detection: GT가 특별한 값 → 최소 1개 함수 호출만 확인
+        if len(flattened_gt) == 1 and flattened_gt[0] in [{}, {"ANY": {}}]:
+            if all_model_calls:
+                return True, f"✅ Relevance: Model called {len(all_model_calls)} function(s) (correct)"
+            else:
+                return False, "❌ Relevance: No function calls (should have at least 1)"
+
+        # 2-3. Multi-turn: Response-based (최소 필수 경로, 중복 허용)
+        if "multi_turn" in category:
+            return BFCLChecker._response_based_checker(all_model_calls, flattened_gt)
+
+        # 2-4. Single-turn: Exact count match (기존 로직)
+        if not all_model_calls:
             return False, "❌ No tool calls generated"
 
         if len(all_model_calls) != len(flattened_gt):
@@ -55,6 +82,48 @@ class BFCLChecker:
             results.append(match_result["message"])
                 
         return all_pass, "\n".join(results)
+    
+    @staticmethod
+    def _response_based_checker(all_model_calls, flattened_gt):
+        """
+        BFCL 공식 Multi-turn 평가: Response-based evaluation
+        최소 필수 경로 (minimum necessary path) 확인 + 중복 단계 허용
+        
+        GT의 모든 함수 호출이 모델 출력에 포함되는지 확인 (순서 무시, 중복 허용)
+        """
+        if not all_model_calls:
+            return False, "❌ No tool calls generated"
+        
+        matched_indices = []
+        results = []
+        all_pass = True
+        
+        for i, g_call in enumerate(flattened_gt):
+            found_match = False
+            
+            for j, m_call in enumerate(all_model_calls):
+                # Response-based: 중복 허용 (이미 매칭된 것도 재사용 가능)
+                match_result = BFCLChecker._single_call_checker(m_call, g_call, i)
+                if match_result["valid"]:
+                    matched_indices.append(j)
+                    results.append(f"GT {i}: ✅ Found at Model[{j}]")
+                    found_match = True
+                    break
+            
+            if not found_match:
+                all_pass = False
+                g_func = list(g_call.keys())[0]
+                results.append(f"GT {i}: ❌ Required call '{g_func}' not found")
+        
+        if all_pass:
+            coverage = len(matched_indices) / len(flattened_gt) * 100
+            extra_calls = len(all_model_calls) - len(set(matched_indices))
+            msg = f"✅ All {len(flattened_gt)} required calls found (Coverage: {coverage:.0f}%)"
+            if extra_calls > 0:
+                msg += f" + {extra_calls} extra calls (allowed)"
+            return True, msg
+        else:
+            return False, "\n".join(results)
     
     @staticmethod
     def _parallel_checker_no_order(all_model_calls, flattened_gt):

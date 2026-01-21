@@ -42,28 +42,79 @@
 
 ## 📊 BFCL 표준 점수 산출 구현
 
-### 공식 평가 방법론
+### 공식 평가 방법론 (BFCL V3/V4 표준 준수)
 
-#### 1. AST (Abstract Syntax Tree) Evaluation ✅
+#### 1. Single-Turn AST Evaluation ✅
 
-- **목적**: 함수 호출의 구조적 정확성 평가
-- **방법**: 파라미터 이름, 타입, 구조를 파싱하여 정답과 비교
-- **적용**: simple_python, multiple, parallel, parallel_multiple 등
-- **구현**: `core/checker.py::ast_checker()`
+**목적**: 단일 턴 함수 호출의 구조적 정확성 평가
 
-#### 2. Executable Evaluation ✅
+**방법**:
+- **AST substring matching**: 파라미터 이름, 타입, 구조를 파싱하여 정답과 비교
+- **Parallel 카테고리**: 순서 무시 (order-independent matching)
+- **Exact count match**: 호출 개수가 정확히 일치해야 함
 
-- **목적**: 실제 실행 가능성 검증
-- **방법**: REST API 및 Python 함수 직접 실행
-- **적용**: live_simple, live_multiple, live_parallel 등
-- **구현**: `core/executor.py::BFCLMockExecutor` (Mock 환경)
+**적용 카테고리**:
+- `simple_python`, `multiple`, `parallel`, `parallel_multiple`
+- `live_simple`, `live_multiple`, `live_parallel`, `live_parallel_multiple`
+
+**구현**: `core/checker.py::ast_checker()` + `_parallel_checker_no_order()`
+
+---
+
+#### 2. Multi-Turn Response-Based Evaluation ✅
+
+**목적**: 다중 턴 대화에서의 함수 호출 시퀀스 평가
+
+**방법** (BFCL 공식 표준):
+- **Response-based**: 모델의 함수 호출 궤적이 **최소 필수 경로 (minimum necessary path)** 를 포함하는지 확인
+- **중복 단계 허용**: 여러 번 `ls` 를 호출하는 등의 중복 허용
+- **순서 무시**: GT의 모든 함수 호출이 모델 출력에 포함되면 PASS (부분집합 매칭)
+
+**적용 카테고리**:
+- `multi_turn_base`, `multi_turn_miss_func`, `multi_turn_miss_param`, `multi_turn_long_context`
+
+**구현**: `core/checker.py::_response_based_checker()`
+
+**예시**:
+```python
+GT: [func1, func2, func3, func4, func5]  # 5개 필수
+Model: [func1, ls, func2, func3, ls, func4, func5, ls]  # 8개 호출
+
+결과: ✅ PASS (모든 필수 호출 포함, 중복 3개 허용)
+```
+
+---
 
 #### 3. Relevance Detection ✅
 
-- **목적**: 관련 없는 함수 호출 방지 능력 평가
-- **방법**: 모델이 적절하게 함수를 회피하는지 확인
-- **적용**: irrelevance, relevance 카테고리
-- **구현**: `main.py::process_test_case()` force_tool 로직
+**목적**: 관련 없는 함수 호출 방지 능력 평가
+
+**A. Irrelevance Detection**:
+- **방법**: GT가 빈 리스트 `[]` → 모델이 함수를 호출하지 않으면 PASS
+- **적용**: `irrelevance`, `live_irrelevance`
+
+**B. Relevance Detection**:
+- **방법**: 최소 1개 이상의 함수 호출이 있으면 PASS (정확도 체크 안 함)
+- **적용**: `live_relevance`
+
+**구현**: 
+- `main.py::process_test_case()` force_tool 로직 (`tool_choice="auto"`)
+- `core/checker.py::ast_checker()` 빈 GT 처리
+
+---
+
+#### 4. Agentic Exact-Match Evaluation ✅
+
+**목적**: 실시간 웹 검색 및 메모리 관리 평가
+
+**방법**:
+- **Strict exact-match**: 모델의 최종 답변에 정답 문자열이 포함되는지 확인
+- **예시 처리**: "Cities that..." 질문 → "30" (정답) 찾기
+
+**적용 카테고리**:
+- `web_search`, `memory`, `format_sensitivity`
+
+**구현**: `core/checker.py::ast_checker()` 문자열 GT 처리
 
 ---
 
