@@ -26,21 +26,23 @@
 
 **데이터 소스**: `berkeley-function-call-leaderboard/bfcl_eval/data/`
 
-#### 지원 카테고리 (14개 전체)
+#### 지원 카테고리 (20개 전체)
 
 ```python
 BFCL_ALL_CATEGORIES = {
-    # AST_NON_LIVE (4개)
-    "simple_python": 400,
-    "multiple": 200,
-    "parallel": 200,
-    "parallel_multiple": 200,
+    # AST_NON_LIVE (6개)
+    "simple_python": 399,
+    "simple_javascript": 49,
+    "simple_java": 99,
+    "multiple": 199,
+    "parallel": 199,
+    "parallel_multiple": 199,
     
     # AST_LIVE (4개)
-    "live_simple": 258,
-    "live_multiple": 1053,
-    "live_parallel": 16,
-    "live_parallel_multiple": 24,
+    "live_simple": 257,
+    "live_multiple": 1052,
+    "live_parallel": 15,
+    "live_parallel_multiple": 23,
     
     # MULTI_TURN (4개)
     "multi_turn_base": 200,
@@ -48,13 +50,19 @@ BFCL_ALL_CATEGORIES = {
     "multi_turn_miss_param": 200,
     "multi_turn_long_context": 200,
     
-    # RELEVANCE (2개)
-    "irrelevance": 240,
-    "relevance": 18,
+    # RELEVANCE (3개)
+    "irrelevance": 239,
+    "live_irrelevance": 884,
+    "live_relevance": 16,
+    
+    # AGENTIC (3개 - V4 추가)
+    "web_search": 99,
+    "memory": 155,
+    "format_sensitivity": 9,
 }
 ```
 
-**총 데이터**: 3,609개 테스트 케이스
+**총 데이터**: 4,693개 테스트 케이스
 
 #### 데이터 로드 검증
 
@@ -325,7 +333,7 @@ mcp-llm-benchmark/
 **4-시트 구조**:
 1. ✅ Detailed Results - 상세 결과
 2. ✅ Summary (BFCL) - 자동 집계 점수 (Excel 수식)
-3. ✅ Dataset Info - 14개 카테고리 정보 (한/영)
+3. ✅ Dataset Info - 20개 카테고리 정보 (한/영)
 4. ✅ Reference - BFCL 공식 문서 링크
 
 **수식 동작 확인**:
@@ -342,7 +350,7 @@ mcp-llm-benchmark/
 
 | 검증 영역 | 평가 | 비고 |
 |---------|------|------|
-| BFCL 데이터 활용 | ⭐⭐⭐⭐⭐ | 공식 V4 데이터, 14개 카테고리 전체 지원 |
+| BFCL 데이터 활용 | ⭐⭐⭐⭐⭐ | 공식 V3/V4 데이터, 20개 카테고리 전체 지원 |
 | 공식 검증 로직 | ⭐⭐⭐⭐⭐ | AST Checker, 공식 프로세스 준수 |
 | 평가 지표 정확성 | ⭐⭐⭐⭐⭐ | BFCL 표준 unweighted average |
 | Excel 수식 자동화 | ⭐⭐⭐⭐⭐ | 실시간 자동 업데이트 |

@@ -22,11 +22,14 @@ python main.py --quick
 ### 3. 전체 벤치마크 실행
 
 ```bash
-# 7개 카테고리 x 5개 샘플 = 총 35개 테스트
+# 20개 카테고리 x 5개 샘플 = 총 100개 테스트
+python main.py
+
+# 전체 데이터셋 (약 4,693개)
 python main.py --full
 ```
 
-**예상 소요 시간:** 약 3-5분  
+**예상 소요 시간:** 약 15-20분 (기본), 3-4시간 (전체)
 **결과 파일:** `results/BFCL_FULL_Report_YYYYMMDD_HHMMSS.xlsx`
 
 ---
@@ -72,8 +75,9 @@ python main.py \
 
 ---
 
-## 📂 테스트 카테고리
+## 📂 테스트 카테고리 (전체 20개)
 
+### AST Non-Live (6개)
 | 카테고리 | 설명 | 난이도 |
 |---------|------|--------|
 | `simple_python` | 단일 Python 함수 호출 | ⭐ |
@@ -82,13 +86,36 @@ python main.py \
 | `multiple` | 여러 파라미터를 가진 함수 호출 | ⭐⭐ |
 | `parallel` | 병렬 함수 호출 | ⭐⭐ |
 | `parallel_multiple` | 복잡한 병렬 호출 | ⭐⭐⭐ |
-| `live_simple` | 실시간 API 시뮬레이션 | ⭐⭐ |
-| `web_search` | 웹 검색 시뮬레이션 | ⭐⭐ |
+
+### AST Live (4개)
+| 카테고리 | 설명 | 난이도 |
+|---------|------|--------|
+| `live_simple` | 실시간 API 단일 호출 | ⭐⭐ |
+| `live_multiple` | 실시간 API 다중 파라미터 | ⭐⭐ |
+| `live_parallel` | 실시간 API 병렬 호출 | ⭐⭐⭐ |
+| `live_parallel_multiple` | 실시간 API 복잡한 병렬 | ⭐⭐⭐ |
+
+### Multi-Turn (4개)
+| 카테고리 | 설명 | 난이도 |
+|---------|------|--------|
 | `multi_turn_base` | 멀티턴 대화 | ⭐⭐⭐ |
 | `multi_turn_miss_func` | 함수 누락 처리 | ⭐⭐⭐ |
 | `multi_turn_miss_param` | 파라미터 누락 처리 | ⭐⭐⭐ |
 | `multi_turn_long_context` | 긴 컨텍스트 처리 | ⭐⭐⭐⭐ |
+
+### Relevance Detection (3개)
+| 카테고리 | 설명 | 난이도 |
+|---------|------|--------|
 | `irrelevance` | 관련 없는 질문 처리 | ⭐⭐ |
+| `live_irrelevance` | 실시간 API 관련없음 회피 | ⭐⭐ |
+| `live_relevance` | 실시간 API 관련 함수 탐지 | ⭐⭐ |
+
+### Agentic (3개)
+| 카테고리 | 설명 | 난이도 |
+|---------|------|--------|
+| `web_search` | 웹 검색 에이전트 | ⭐⭐⭐ |
+| `memory` | 메모리 관리 | ⭐⭐⭐ |
+| `format_sensitivity` | 포맷 민감도 | ⭐⭐ |
 
 ---
 
@@ -119,7 +146,7 @@ BFCL 공식 점수 산출 방법에 따른 통계:
 
 ### 3️⃣ Dataset Info (데이터셋 정보)
 
-전체 14개 BFCL 카테고리 정보:
+전체 20개 BFCL 카테고리 정보:
 - 카테고리명, 전체 데이터 개수, 그룹, 난이도, 설명
 
 ### 4️⃣ Reference (참고 자료)

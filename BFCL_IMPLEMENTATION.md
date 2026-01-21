@@ -96,25 +96,27 @@ Group Accuracy = (Σ Category Accuracy in Group) / M
 
 ---
 
-## 📂 BFCL V3 전체 카테고리 지원
+## 📂 BFCL V3/V4 전체 카테고리 지원
 
 ### Single-Turn Non-Live (AST Evaluation)
 
 | 카테고리 | 데이터 수 | 난이도 | 설명 |
 |---------|---------|--------|------|
-| `simple_python` | 400 | ⭐ | 단일 Python 함수 호출 |
-| `multiple` | 200 | ⭐⭐ | 다중 파라미터 함수 |
-| `parallel` | 200 | ⭐⭐ | 병렬 함수 호출 |
-| `parallel_multiple` | 200 | ⭐⭐⭐ | 병렬 + 다중 파라미터 |
+| `simple_python` | 399 | ⭐ | 단일 Python 함수 호출 |
+| `simple_javascript` | 49 | ⭐ | 단일 JavaScript 함수 호출 |
+| `simple_java` | 99 | ⭐ | 단일 Java 함수 호출 |
+| `multiple` | 199 | ⭐⭐ | 다중 파라미터 함수 |
+| `parallel` | 199 | ⭐⭐ | 병렬 함수 호출 |
+| `parallel_multiple` | 199 | ⭐⭐⭐ | 병렬 + 다중 파라미터 |
 
 ### Single-Turn Live (Executable + AST)
 
 | 카테고리 | 데이터 수 | 난이도 | 설명 |
 |---------|---------|--------|------|
-| `live_simple` | 258 | ⭐⭐ | Live API 단일 호출 |
-| `live_multiple` | 1053 | ⭐⭐ | Live API 다중 파라미터 |
-| `live_parallel` | 16 | ⭐⭐⭐ | Live API 병렬 호출 |
-| `live_parallel_multiple` | 24 | ⭐⭐⭐ | Live API 병렬 + 다중 |
+| `live_simple` | 257 | ⭐⭐ | Live API 단일 호출 |
+| `live_multiple` | 1,052 | ⭐⭐ | Live API 다중 파라미터 |
+| `live_parallel` | 15 | ⭐⭐⭐ | Live API 병렬 호출 |
+| `live_parallel_multiple` | 23 | ⭐⭐⭐ | Live API 병렬 + 다중 |
 
 ### Multi-Turn (State + Response Based)
 
@@ -129,10 +131,19 @@ Group Accuracy = (Σ Category Accuracy in Group) / M
 
 | 카테고리 | 데이터 수 | 난이도 | 설명 |
 |---------|---------|--------|------|
-| `irrelevance` | 240 | ⭐⭐ | 함수 호출 회피 |
-| `relevance` | 18 | ⭐⭐ | 관련 함수 탐지 |
+| `irrelevance` | 239 | ⭐⭐ | 함수 호출 회피 |
+| `live_irrelevance` | 884 | ⭐⭐ | Live API 관련없음 회피 |
+| `live_relevance` | 16 | ⭐⭐ | Live API 관련 함수 탐지 |
 
-**전체**: 14개 카테고리, 총 3,609개 테스트 케이스
+### Agentic (V4)
+
+| 카테고리 | 데이터 수 | 난이도 | 설명 |
+|---------|---------|--------|------|
+| `web_search` | 99 | ⭐⭐⭐ | 웹 검색 에이전트 |
+| `memory` | 155 | ⭐⭐⭐ | 메모리 관리 |
+| `format_sensitivity` | 9 | ⭐⭐ | 포맷 민감도 |
+
+**전체**: 20개 카테고리, 총 4,693개 테스트 케이스
 
 ---
 
@@ -157,9 +168,9 @@ python main.py --full
 ```
 
 **실행 결과**:
-- 14개 전체 카테고리
-- 각 5개씩 = 총 70개 샘플
-- 소요 시간: 약 5-7분
+- 20개 전체 카테고리
+- 각 5개씩 = 총 100개 샘플
+- 소요 시간: 약 15-20분
 
 ### 커스텀 균등 샘플링
 
@@ -187,7 +198,7 @@ python main.py \
 - **Category Scores**: 각 카테고리별 정확도 ✅
 
 #### 3️⃣ Dataset Info
-- 14개 전체 카테고리 정보
+- 20개 전체 카테고리 정보
 - 데이터 개수, 그룹, 난이도, 설명
 
 #### 4️⃣ Reference
@@ -220,7 +231,7 @@ python main.py \
 
 ### 4. 데이터 구조 ✅
 
-- ✅ 14개 전체 카테고리 지원
+- ✅ 20개 전체 카테고리 지원 (V3 + V4)
 - ✅ 공식 데이터 로더 사용
 - ✅ 균등/비율 샘플링 옵션
 
@@ -323,8 +334,16 @@ elif "multi_turn" in cat:
 1. ✅ 공식 아키텍처 프로세스 준수
 2. ✅ BFCL 표준 평가 방법 구현
 3. ✅ 공식 점수 산출 공식 적용
-4. ✅ 14개 전체 카테고리 지원
+4. ✅ 20개 전체 카테고리 지원 (V3 + V4)
 5. ✅ 4-시트 리포트 생성
+6. ✅ 다중 모델 비교 지원
 
 **재사용 가능**하고 **확장 가능**한 구조로 설계되어,  
 나중에 전체 벤치마크 실행이나 다른 모델 평가에 즉시 활용할 수 있습니다. 🎯
+
+### 다중 모델 비교
+
+```bash
+# 20개 카테고리 × 3개 샘플로 5개 모델 순차 실행
+python run_multi_models.py
+```

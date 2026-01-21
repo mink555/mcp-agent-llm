@@ -55,9 +55,9 @@ cp .env.example .env
 | 옵션 | 테스트 수 | 예상 시간 | 용도 |
 |------|----------|----------|------|
 | `--quick` | **6개** (3개 카테고리 × 2개) | ~2분 | 빠른 테스트 |
-| 기본 | **70개** (14개 카테고리 × 5개) | ~10분 | 일반 평가 |
+| 기본 | **100개** (20개 카테고리 × 5개) | ~15분 | 일반 평가 |
 | `--full` | **~4,693개** (전체) | ~3-4시간 | 완전한 벤치마크 |
-| `--samples N` | **14 × N개** | 가변 | 커스텀 |
+| `--samples N` | **20 × N개** | 가변 | 커스텀 |
 
 #### 실행 예시
 
@@ -79,6 +79,9 @@ python main.py --categories simple_python multiple --samples 3
 
 # 다른 모델 사용
 python main.py --model "anthropic/claude-3-haiku" --quick
+
+# 다중 모델 순차 실행 (20개 카테고리 × 3개 샘플 × 5개 모델 = 300개 테스트)
+python run_multi_models.py
 ```
 
 ## 📈 결과 확인

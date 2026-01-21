@@ -53,19 +53,21 @@ def _format_model_name_for_filename(model_name):
 # ==========================================
 # [BFCL 공식 카테고리 정의]
 # ==========================================
-# BFCL V3 전체 카테고리 (공식 벤치마크 구성)
+# BFCL V3/V4 전체 카테고리 (공식 벤치마크 구성 - 총 20개)
 BFCL_ALL_CATEGORIES = {
     # Single-turn Non-Live (AST Evaluation)
-    "simple_python": {"count": 400, "group": "AST_NON_LIVE", "difficulty": "⭐"},
-    "multiple": {"count": 200, "group": "AST_NON_LIVE", "difficulty": "⭐⭐"},
-    "parallel": {"count": 200, "group": "AST_NON_LIVE", "difficulty": "⭐⭐"},
-    "parallel_multiple": {"count": 200, "group": "AST_NON_LIVE", "difficulty": "⭐⭐⭐"},
+    "simple_python": {"count": 399, "group": "AST_NON_LIVE", "difficulty": "⭐"},
+    "simple_javascript": {"count": 49, "group": "AST_NON_LIVE", "difficulty": "⭐"},
+    "simple_java": {"count": 99, "group": "AST_NON_LIVE", "difficulty": "⭐"},
+    "multiple": {"count": 199, "group": "AST_NON_LIVE", "difficulty": "⭐⭐"},
+    "parallel": {"count": 199, "group": "AST_NON_LIVE", "difficulty": "⭐⭐"},
+    "parallel_multiple": {"count": 199, "group": "AST_NON_LIVE", "difficulty": "⭐⭐⭐"},
     
     # Single-turn Live (Executable + AST)
-    "live_simple": {"count": 258, "group": "AST_LIVE", "difficulty": "⭐⭐"},
-    "live_multiple": {"count": 1053, "group": "AST_LIVE", "difficulty": "⭐⭐"},
-    "live_parallel": {"count": 16, "group": "AST_LIVE", "difficulty": "⭐⭐⭐"},
-    "live_parallel_multiple": {"count": 24, "group": "AST_LIVE", "difficulty": "⭐⭐⭐"},
+    "live_simple": {"count": 257, "group": "AST_LIVE", "difficulty": "⭐⭐"},
+    "live_multiple": {"count": 1052, "group": "AST_LIVE", "difficulty": "⭐⭐"},
+    "live_parallel": {"count": 15, "group": "AST_LIVE", "difficulty": "⭐⭐⭐"},
+    "live_parallel_multiple": {"count": 23, "group": "AST_LIVE", "difficulty": "⭐⭐⭐"},
     
     # Multi-turn (State-based + Response-based)
     "multi_turn_base": {"count": 200, "group": "MULTI_TURN", "difficulty": "⭐⭐⭐"},
@@ -74,8 +76,14 @@ BFCL_ALL_CATEGORIES = {
     "multi_turn_long_context": {"count": 200, "group": "MULTI_TURN", "difficulty": "⭐⭐⭐⭐"},
     
     # Relevance Detection
-    "irrelevance": {"count": 240, "group": "RELEVANCE", "difficulty": "⭐⭐"},
-    "relevance": {"count": 18, "group": "RELEVANCE", "difficulty": "⭐⭐"},
+    "irrelevance": {"count": 239, "group": "RELEVANCE", "difficulty": "⭐⭐"},
+    "live_irrelevance": {"count": 884, "group": "RELEVANCE", "difficulty": "⭐⭐"},
+    "live_relevance": {"count": 16, "group": "RELEVANCE", "difficulty": "⭐⭐"},
+    
+    # Agentic (V4 추가)
+    "web_search": {"count": 99, "group": "AGENTIC", "difficulty": "⭐⭐⭐"},
+    "memory": {"count": 155, "group": "AGENTIC", "difficulty": "⭐⭐⭐"},
+    "format_sensitivity": {"count": 9, "group": "AGENTIC", "difficulty": "⭐⭐"},
 }
 
 # ==========================================
@@ -101,7 +109,7 @@ QUICK_TEST_CONFIG = {
 # 전체 벤치마크 설정 (모든 데이터 사용)
 FULL_TEST_CONFIG = {
     "samples_per_cat": 999999,  # 각 카테고리의 모든 샘플 사용
-    "categories": list(BFCL_ALL_CATEGORIES.keys()),  # 전체 14개 카테고리
+    "categories": list(BFCL_ALL_CATEGORIES.keys()),  # 전체 20개 카테고리
     "sampling_strategy": "equal",
     "rate_limit_delay": 3
 }
@@ -274,7 +282,8 @@ class ExcelReporter:
                 "AST_NON_LIVE": "AST 비실행 평가",
                 "AST_LIVE": "AST 실행 평가",
                 "MULTI_TURN": "멀티턴 대화",
-                "RELEVANCE": "관련성 탐지"
+                "RELEVANCE": "관련성 탐지",
+                "AGENTIC": "에이전트 기능"
             }.get(group, group)
             summary_data.append({
                 "지표 (Metric)": f"{group} ({group_kr})",
@@ -558,7 +567,9 @@ class ExcelReporter:
     def _get_category_name_korean(cat):
         """카테고리 한국어 이름 반환"""
         korean_names = {
-            "simple_python": "단일 함수",
+            "simple_python": "단일 Python",
+            "simple_javascript": "단일 JavaScript",
+            "simple_java": "단일 Java",
             "multiple": "다중 파라미터",
             "parallel": "병렬 호출",
             "parallel_multiple": "병렬 다중",
@@ -571,7 +582,11 @@ class ExcelReporter:
             "multi_turn_miss_param": "멀티턴 파라미터누락",
             "multi_turn_long_context": "멀티턴 긴컨텍스트",
             "irrelevance": "관련없음 탐지",
-            "relevance": "관련성 탐지",
+            "live_irrelevance": "실행 관련없음",
+            "live_relevance": "실행 관련성",
+            "web_search": "웹 검색",
+            "memory": "메모리 관리",
+            "format_sensitivity": "포맷 민감도",
         }
         return korean_names.get(cat, cat)
     
@@ -580,6 +595,8 @@ class ExcelReporter:
         """카테고리별 설명 반환 (한국어 + 영어)"""
         descriptions = {
             "simple_python": "기본 파라미터를 가진 단일 Python 함수 호출 | Single Python function call with basic parameters",
+            "simple_javascript": "기본 파라미터를 가진 단일 JavaScript 함수 호출 | Single JavaScript function call with basic parameters",
+            "simple_java": "기본 파라미터를 가진 단일 Java 함수 호출 | Single Java function call with basic parameters",
             "multiple": "단일 함수에 여러 파라미터 전달 | Multiple parameters in single function call",
             "parallel": "여러 함수를 병렬로 호출 (순서 무시) | Multiple functions called in parallel (order-independent)",
             "parallel_multiple": "여러 함수를 다중 파라미터로 병렬 호출 (순서 무시) | Multiple functions with multiple parameters in parallel (order-independent)",
@@ -592,7 +609,11 @@ class ExcelReporter:
             "multi_turn_miss_param": "파라미터 누락 처리가 필요한 멀티턴 | Multi-turn with missing parameter handling",
             "multi_turn_long_context": "긴 컨텍스트가 필요한 멀티턴 | Multi-turn with extended context requirements",
             "irrelevance": "함수를 호출하지 말아야 할 때 탐지 | Detecting when NOT to call any function",
-            "relevance": "관련 있는 함수 탐지 | Detecting which functions are relevant",
+            "live_irrelevance": "실제 API에서 관련없는 함수 호출 회피 | Avoiding irrelevant function calls with live APIs",
+            "live_relevance": "실제 API에서 관련 있는 함수 탐지 | Detecting relevant functions with live APIs",
+            "web_search": "웹 검색 에이전트 기능 | Web search agent capabilities",
+            "memory": "대화 메모리 관리 및 컨텍스트 유지 | Memory management and context retention",
+            "format_sensitivity": "다양한 입력 포맷에 대한 민감도 | Sensitivity to various input formats",
         }
         return descriptions.get(cat, "설명 없음 | No description available")
 
@@ -672,13 +693,17 @@ Your goal is to successfully call the right functions with the right parameters.
                 # Simple/Single-turn 카테고리: 첫 번째 도구 호출 후 종료
                 if cat in ["simple_python", "simple_javascript", "simple_java", "live_simple", "web_search"]:
                     break
-                # Multiple/Parallel: 여러 도구를 한 번에 호출 후 종료
-                elif cat in ["multiple", "parallel", "parallel_multiple"]:
+                # Multiple/Parallel: 여러 도구를 한 번에 호출 후 종료 (Live 포함)
+                elif cat in ["multiple", "parallel", "parallel_multiple", 
+                             "live_multiple", "live_parallel", "live_parallel_multiple"]:
                     break
                 # Multi-turn 카테고리: 다음 사용자 턴으로 이동
                 elif "multi_turn" in cat:
                     break
-                # 기타: 멀티홉 가능성이 있으면 계속 (예: 검색 → 추출)
+                # Relevance 카테고리: 단일 판단이므로 break
+                elif cat in ["irrelevance", "live_irrelevance", "live_relevance"]:
+                    break
+                # Agentic 카테고리 (memory, format_sensitivity): 멀티홉 가능성 있음
                 else:
                     continue
             else:
@@ -854,7 +879,7 @@ def main():
         print("🚀 빠른 테스트 모드 실행 (3개 카테고리 × 2개 샘플 = 6개)\n")
     elif args.full:
         config = {**DEFAULT_CONFIG, **FULL_TEST_CONFIG}
-        print("🚀 전체 벤치마크 모드 실행 (모든 카테고리 × 모든 샘플 = ~4,693개)\n")
+        print("🚀 전체 벤치마크 모드 실행 (20개 카테고리 × 모든 샘플 = ~4,693개)\n")
     else:
         config = DEFAULT_CONFIG.copy()
         
