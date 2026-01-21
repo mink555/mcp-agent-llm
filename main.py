@@ -98,6 +98,14 @@ QUICK_TEST_CONFIG = {
     "rate_limit_delay": 5
 }
 
+# 전체 벤치마크 설정 (모든 데이터 사용)
+FULL_TEST_CONFIG = {
+    "samples_per_cat": 999999,  # 각 카테고리의 모든 샘플 사용
+    "categories": list(BFCL_ALL_CATEGORIES.keys()),  # 전체 14개 카테고리
+    "sampling_strategy": "equal",
+    "rate_limit_delay": 3
+}
+
 class BFCLScorer:
     """BFCL 표준 점수 산출 클래스"""
     
@@ -794,10 +802,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 사용 예시:
-  # 빠른 샘플 테스트 (2개 카테고리 x 2개 샘플)
+  # 빠른 샘플 테스트 (3개 카테고리 x 2개 샘플 = 6개)
   python main.py --quick
   
-  # 전체 실행 (모든 카테고리 x 5개 샘플)
+  # 전체 실행 (모든 카테고리 x 모든 샘플 = ~4,693개)
   python main.py --full
   
   # 커스텀 설정
@@ -817,7 +825,7 @@ def main():
     parser.add_argument(
         "--full",
         action="store_true",
-        help="전체 벤치마크 실행 (모든 카테고리, 각 5개 샘플)"
+        help="전체 벤치마크 실행 (모든 카테고리, 모든 샘플 ~4,693개)"
     )
     
     parser.add_argument(
@@ -843,10 +851,10 @@ def main():
     # 설정 구성
     if args.quick:
         config = {**DEFAULT_CONFIG, **QUICK_TEST_CONFIG}
-        print("🚀 빠른 테스트 모드 실행\n")
+        print("🚀 빠른 테스트 모드 실행 (3개 카테고리 × 2개 샘플 = 6개)\n")
     elif args.full:
-        config = DEFAULT_CONFIG.copy()
-        print("🚀 전체 벤치마크 모드 실행\n")
+        config = {**DEFAULT_CONFIG, **FULL_TEST_CONFIG}
+        print("🚀 전체 벤치마크 모드 실행 (모든 카테고리 × 모든 샘플 = ~4,693개)\n")
     else:
         config = DEFAULT_CONFIG.copy()
         
