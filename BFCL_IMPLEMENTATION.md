@@ -61,26 +61,46 @@
 
 ---
 
-#### 2. Multi-Turn Response-Based Evaluation ✅
+#### 2. Multi-Turn Response-Based Evaluation (Subset Matching) ✅
 
 **목적**: 다중 턴 대화에서의 함수 호출 시퀀스 평가
 
-**방법** (BFCL 공식 표준):
-- **Response-based**: 모델의 함수 호출 궤적이 **최소 필수 경로 (minimum necessary path)** 를 포함하는지 확인
-- **중복 단계 허용**: 여러 번 `ls` 를 호출하는 등의 중복 허용
-- **순서 무시**: GT의 모든 함수 호출이 모델 출력에 포함되면 PASS (부분집합 매칭)
+**공식 BFCL V3 규칙**: Ground Truth must be a **strict subset** of model result  
+**출처**: [BFCL V3 Blog](https://gorilla.cs.berkeley.edu/blogs/13_bfcl_v3_multi_turn.html)
+
+**평가 규칙**:
+
+| 규칙 | 설명 |
+|------|------|
+| **Subset Matching** | GT의 모든 함수 호출이 모델 출력에 포함되어야 함 |
+| **Order Independent** | 순서는 무관 |
+| **Duplicates Allowed** | 중복 호출 허용 (탐색 과정에서 자연스럽게 발생) |
+| **All-or-Nothing** | 하나라도 누락되면 FAIL |
+| **State + Response** | Multi-turn은 state-based & response-based 모두 통과 필요 |
+
+**Minimal Viable Execution Paths**: GT는 사용자 요청에 응답하기 위해 **반드시 실행되어야 하는** 함수 호출 목록
 
 **적용 카테고리**:
 - `multi_turn_base`, `multi_turn_miss_func`, `multi_turn_miss_param`, `multi_turn_long_context`
 
 **구현**: `core/checker.py::_response_based_checker()`
 
-**예시**:
+**예시 1 (PASS)**:
 ```python
-GT: [func1, func2, func3, func4, func5]  # 5개 필수
-Model: [func1, ls, func2, func3, ls, func4, func5, ls]  # 8개 호출
+# 파일 이동 작업
+GT:  ["cd('documents')", "mkdir('archive')", "mv('report.pdf', 'archive')"]
+Model: ["ls()", "cd('documents')", "ls()", "mkdir('archive')", "mv('report.pdf', 'archive')", "ls()"]
 
-결과: ✅ PASS (모든 필수 호출 포함, 중복 3개 허용)
+결과: ✅ PASS (모든 GT 포함, 중복 3개 허용)
+```
+
+**예시 2 (FAIL)**:
+```python
+# 일부 함수 누락
+GT:  ["cd('workspace')", "grep('log.txt', 'Error')", "tail('log.txt', 20)"]
+Model: ["cd('workspace')", "grep('log.txt', 'Error')"]  # tail 누락
+
+결과: ❌ FAIL (3/3 중 2개만 매칭, 67%)
 ```
 
 ---

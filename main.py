@@ -498,6 +498,16 @@ class ExcelReporter:
             {"구분 (Section)": "✅ 관련성 탐지", "내용 (Content)": "관련 없는 함수 호출 회피 능력 (Ability to avoid irrelevant function calls)"},
             {"구분 (Section)": "🔀 병렬 호출 순서", "내용 (Content)": "BFCL 표준: 병렬(parallel) 카테고리는 호출 순서 무시. 집합처럼 매칭 (Order-independent matching for parallel function calls)"},
             {"구분 (Section)": " ", "내용 (Content)": " "},
+            {"구분 (Section)": "━━━ Multi-Turn Response-Based Evaluation ━━━", "내용 (Content)": " "},
+            {"구분 (Section)": "📜 공식 규칙", "내용 (Content)": "Ground Truth must be a strict subset of model result (출처: BFCL V3 Blog)"},
+            {"구분 (Section)": "🔍 Subset Matching", "내용 (Content)": "GT의 모든 함수 호출이 모델 출력에 포함되어야 함. 예: GT [A,B,C] → Model [A,B,C,D] ✅ PASS"},
+            {"구분 (Section)": "🔄 Order Independent", "내용 (Content)": "호출 순서는 무관. 예: GT [A,B,C] → Model [C,B,A] ✅ PASS"},
+            {"구분 (Section)": "📚 Duplicates Allowed", "내용 (Content)": "중복 호출 허용 (탐색 과정). 예: GT [A,B] → Model [A,ls,B,ls] ✅ PASS"},
+            {"구분 (Section)": "⚠️ All-or-Nothing", "내용 (Content)": "하나라도 누락되면 FAIL. 예: GT [A,B,C] → Model [A,B] ❌ FAIL (C 누락)"},
+            {"구분 (Section)": "🔗 공식 문서", "내용 (Content)": "https://gorilla.cs.berkeley.edu/blogs/13_bfcl_v3_multi_turn.html"},
+            {"구분 (Section)": "📖 Minimal Viable Paths", "내용 (Content)": "GT는 사용자 요청에 응답하기 위해 반드시 실행되어야 하는 함수 호출 목록"},
+            {"구분 (Section)": "🔄 State + Response", "내용 (Content)": "Multi-turn은 state-based와 response-based 두 체커 모두 통과 필요"},
+            {"구분 (Section)": " ", "내용 (Content)": " "},
             {"구분 (Section)": "━━━ 점수 산출 (Scoring) ━━━", "내용 (Content)": " "},
             {"구분 (Section)": "📈 전체 정확도", "내용 (Content)": "Overall Accuracy = Σ(Category Accuracy) / N (모든 카테고리의 비가중 평균)"},
             {"구분 (Section)": "📊 카테고리 정확도", "내용 (Content)": "Category Accuracy = (PASS count / Total count) × 100%"},
@@ -624,6 +634,28 @@ def process_test_case(handler, executor, checker, cat, q, a, max_steps=3):
     tools = BFCLDataLoader().get_functions(cat, q)
     gt = a['ground_truth']
     
+    # Memory 카테고리인 경우 prerequisite conversation 로드
+    prereq_turns = []
+    if "memory" in cat:
+        scenario = q.get("scenario", "")
+        if scenario:
+            loader = BFCLDataLoader()
+            prereq_file = loader.data_root / "memory_prereq_conversation" / f"memory_{scenario}.json"
+            if prereq_file.exists():
+                with open(prereq_file, 'r', encoding='utf-8') as f:
+                    # JSONL 형식: 각 줄이 하나의 prerequisite conversation
+                    for line in f:
+                        if line.strip():
+                            prereq_data = json.loads(line)
+                            # test_id의 prefix를 확인하여 해당하는 prerequisite conversation 찾기
+                            # 예: memory_0-customer-0 -> memory_prereq_0-customer-0
+                            test_id_parts = test_id.split('-')
+                            if len(test_id_parts) >= 2:
+                                prereq_id = f"memory_prereq_{test_id_parts[0].replace('memory_', '')}-{test_id_parts[1]}-{test_id_parts[2] if len(test_id_parts) > 2 else '0'}"
+                                if prereq_data.get('id') == prereq_id:
+                                    prereq_turns = prereq_data.get('question', [])
+                                    break
+    
     # 개선된 시스템 프롬프트 (Tool Calling Best Practices 적용)
     SYSTEM_PROMPT = """You are an expert function-calling assistant. Your primary job is to call the appropriate functions with correct parameters.
 
@@ -662,16 +694,64 @@ Your goal is to successfully call the right functions with the right parameters.
     all_model_calls = []
     final_res = None
     final_content = ""
+    
+    # Memory 카테고리: prerequisite conversation 먼저 실행
+    if prereq_turns:
+        for prereq_turn in prereq_turns:
+            messages.extend(prereq_turn)
+            
+            # Prerequisite turn 실행 (메모리에 정보 저장)
+            try:
+                res = handler.inference(
+                    messages=[{"role": "system", "content": SYSTEM_PROMPT}] + messages,
+                    tools=tools,
+                    temperature=0,
+                    force_tool=False
+                )
+                
+                ast_out = handler.decode_ast(res)
+                if ast_out:
+                    all_model_calls.extend(ast_out)
+                    msg_dict = res["msg_obj"].model_dump()
+                    
+                    # arguments sanitization
+                    if msg_dict.get("tool_calls"):
+                        for tc in msg_dict["tool_calls"]:
+                            if tc.get("function"):
+                                args = tc["function"].get("arguments", "")
+                                if not args or str(args).strip() in ["", "None", "null", "''", '""']:
+                                    tc["function"]["arguments"] = "{}"
+                    
+                    messages.append(msg_dict)
+                    
+                    # 도구 실행
+                    for i, call in enumerate(ast_out):
+                        feedback = executor.execute(call)
+                        call_id = res["msg_obj"].tool_calls[i].id if (res["msg_obj"].tool_calls and len(res["msg_obj"].tool_calls) > i) else f"call_prereq_{i}"
+                        messages.append({"role": "tool", "tool_call_id": call_id, "content": feedback})
+                else:
+                    messages.append({"role": "assistant", "content": res["content"]})
+            except Exception as e:
+                # Prerequisite turn 실패해도 계속 진행 (일부 정보는 메모리에 저장되었을 수 있음)
+                print(f"⚠️ Prerequisite turn failed: {str(e)}")
+                pass
 
     for turn_idx, turn_msgs in enumerate(user_turns):
         messages.extend(turn_msgs)
         
         # 에이전트 루프 (멀티홉 처리)
         for step in range(max_steps):
-            # Multi-turn: 모델이 자율적으로 도구 호출 여부 결정 (tool_choice="auto")
-            # Single-turn: tool_choice="required" 사용하여 도구 호출 강제
-            is_multi_turn = "multi_turn" in cat or cat in ["web_search", "memory"]
-            force_tool_call = not is_multi_turn and cat not in ["irrelevance", "live_irrelevance", "live_relevance"]
+            # BFCL 공식 표준:
+            # - Multi-turn 카테고리: tool_choice="auto" (모델이 판단)
+            # - Agentic (web_search, memory): tool_choice="auto" (multi-hop 지원)
+            # - Single-turn: tool_choice="required" (도구 호출 강제)
+            # - Irrelevance: tool_choice="auto" (관련 없으면 호출 안 함)
+            is_multi_turn = "multi_turn" in cat
+            is_agentic = cat in ["web_search", "memory"]
+            is_relevance_check = cat in ["irrelevance", "live_irrelevance", "live_relevance"]
+            
+            # force_tool_call: Single-turn 카테고리만 True (agentic은 False)
+            force_tool_call = not is_multi_turn and not is_agentic and not is_relevance_check
             
             res = handler.inference(
                 messages=[{"role": "system", "content": SYSTEM_PROMPT}] + messages,

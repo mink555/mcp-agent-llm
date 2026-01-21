@@ -152,17 +152,43 @@ class ModelHandler:
         def sanitize_schema(schema):
             if isinstance(schema, dict):
                 new_schema = schema.copy()
-                # Type mapping for non-standard JSON Schema types used in BFCL
-                type_mapping = {
-                    "dict": "object",
-                    "float": "number",
-                    "int": "integer",
-                    "list": "array",
-                    "bool": "boolean"
-                }
-                if new_schema.get("type") in type_mapping:
-                    new_schema["type"] = type_mapping[new_schema["type"]]
                 
+                # Handle "type" field
+                if "type" in new_schema:
+                    type_value = new_schema["type"]
+                    
+                    # 1. Handle "any" type (non-standard) - remove the type field
+                    if type_value == "any":
+                        del new_schema["type"]
+                    # 2. Handle uppercase types (String, Boolean, etc.)
+                    elif isinstance(type_value, str):
+                        # Convert to lowercase first
+                        type_lower = type_value.lower()
+                        
+                        # Type mapping for non-standard JSON Schema types used in BFCL
+                        type_mapping = {
+                            "dict": "object",
+                            "float": "number",
+                            "int": "integer",
+                            "list": "array",
+                            "bool": "boolean",
+                            # Standard types (already lowercase)
+                            "string": "string",
+                            "number": "number",
+                            "integer": "integer",
+                            "object": "object",
+                            "array": "array",
+                            "boolean": "boolean",
+                            "null": "null"
+                        }
+                        
+                        if type_lower in type_mapping:
+                            new_schema["type"] = type_mapping[type_lower]
+                        else:
+                            # Unknown type, remove it
+                            del new_schema["type"]
+                
+                # Recursively sanitize nested properties
                 if "properties" in new_schema:
                     new_schema["properties"] = {k: sanitize_schema(v) for k, v in new_schema["properties"].items()}
                 if "items" in new_schema:

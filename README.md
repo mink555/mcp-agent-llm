@@ -42,9 +42,41 @@ Berkeley Function Calling Leaderboard (BFCL) 벤치마크를 쉽게 실행할 �
 - **Parallel**: 순서 무관 (order-independent matching)
 - **적용**: `simple_*`, `multiple`, `parallel`, `live_*` 카테고리
 
-### 2. Multi-Turn: Response-Based ✅
-- **방법**: 최소 필수 경로 포함 확인 + 중복 허용
-- **예시**: GT 5개 필수 → Model 8개 호출 (5개 포함 + 3개 중복) = ✅ PASS
+### 2. Multi-Turn: Response-Based (Subset Matching) ✅
+
+**공식 BFCL V3 규칙**: Ground Truth must be a **strict subset** of model result
+
+#### 평가 규칙 (출처: [BFCL V3 Blog](https://gorilla.cs.berkeley.edu/blogs/13_bfcl_v3_multi_turn.html))
+
+| 규칙 | 설명 | 예시 |
+|------|------|------|
+| **Subset Matching** | GT의 모든 함수 호출이 모델 출력에 포함되어야 함 | GT: `[A, B, C]` → Model: `[A, B, C, D]` ✅ |
+| **Order Independent** | 순서는 무관 | GT: `[A, B, C]` → Model: `[C, B, A]` ✅ |
+| **Duplicates Allowed** | 중복 호출 허용 (탐색 과정에서 자연스럽게 발생) | GT: `[A, B]` → Model: `[A, ls, B, ls]` ✅ |
+| **All-or-Nothing** | 하나라도 누락되면 FAIL | GT: `[A, B, C]` → Model: `[A, B]` ❌ (C 누락) |
+| **State + Response** | Multi-turn은 state-based & response-based 모두 통과 필요 | 두 체커 모두 PASS해야 최종 PASS |
+
+#### Minimal Viable Execution Paths
+
+Ground Truth는 사용자 요청에 응답하기 위해 **반드시 실행되어야 하는** 함수 호출 목록입니다.
+
+**예시 1: 파일 이동 작업**
+```python
+# User: "Move report.pdf to archive folder"
+GT:  ["cd('documents')", "mkdir('archive')", "mv('report.pdf', 'archive')"]
+
+# Model의 탐색 과정 (중복 허용)
+Model: ["ls()", "cd('documents')", "ls()", "mkdir('archive')", "mv('report.pdf', 'archive')", "ls()"]
+Result: ✅ PASS (모든 GT 포함, 중복 3개 허용)
+```
+
+**예시 2: 일부 누락 (FAIL)**
+```python
+GT:  ["cd('workspace')", "grep('log.txt', 'Error')", "tail('log.txt', 20)"]
+Model: ["cd('workspace')", "grep('log.txt', 'Error')"]  # tail 누락
+Result: ❌ FAIL (3/3 중 2개만 매칭, 67%)
+```
+
 - **적용**: `multi_turn_*` 카테고리
 
 ### 3. Relevance: Detection ✅
