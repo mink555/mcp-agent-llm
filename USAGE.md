@@ -12,11 +12,11 @@ echo "OPENROUTER_API_KEY=your-api-key-here" > .env
 ### 2. 빠른 샘플 테스트 (권장)
 
 ```bash
-# 2개 카테고리 x 2개 샘플 = 총 4개 테스트
+# 3개 카테고리 x 2개 샘플 = 총 6개 테스트
 python main.py --quick
 ```
 
-**예상 소요 시간:** 약 10초  
+**예상 소요 시간:** 약 10-20초  
 **결과 파일:** `results/BFCL_QUICK_Report_YYYYMMDD_HHMMSS.xlsx`
 
 ### 3. 전체 벤치마크 실행
@@ -255,7 +255,7 @@ python main.py --quick --model "mistralai/mistral-small-3.2-24b-instruct"
 
 ### 커스터마이징
 
-프롬프트를 수정하려면 `main.py`의 `SYSTEM_PROMPT` 변수를 편집하세요 (84-108번 줄).
+프롬프트를 수정하려면 `main.py`의 `SYSTEM_PROMPT` 변수를 편집하세요 (628-652번 줄).
 
 ---
 
@@ -269,4 +269,4 @@ python main.py --help
 
 ## 📝 라이센스
 
-MIT License
+Apache 2.0 License
