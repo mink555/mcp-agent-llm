@@ -838,6 +838,9 @@ def main():
   
   # 특정 모델로 실행
   python main.py --model "anthropic/claude-3-haiku" --samples 2
+  
+  # 대기 시간을 줄여서 빠르게 실행
+  python main.py --quick --delay 1
         """
     )
     
@@ -871,6 +874,12 @@ def main():
         help="사용할 모델 이름 (기본값: mistral-small-3.1)"
     )
     
+    parser.add_argument(
+        "--delay",
+        type=int,
+        help="카테고리 간 대기 시간 (초, 기본값: quick=5, full=3, default=3)"
+    )
+    
     args = parser.parse_args()
     
     # 설정 구성
@@ -890,6 +899,8 @@ def main():
         config["categories"] = args.categories
     if args.model:
         config["model_name"] = args.model
+    if args.delay is not None:
+        config["rate_limit_delay"] = args.delay
     
     # 벤치마크 실행
     run_benchmark(config)
