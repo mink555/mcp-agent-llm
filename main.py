@@ -118,6 +118,15 @@ FULL_TEST_CONFIG = {
 class BFCLScorer:
     """BFCL 표준 점수 산출 클래스"""
     
+    # BFCL v4 공식 가중치 (Full Benchmark용)
+    V4_WEIGHTS = {
+        "AGENTIC": 0.40,      # web_search, memory
+        "MULTI_TURN": 0.30,   # multi_turn_*
+        "AST_LIVE": 0.10,     # live_*
+        "AST_NON_LIVE": 0.10, # simple_*, multiple, parallel_*
+        "RELEVANCE": 0.10     # irrelevance, live_irrelevance, live_relevance
+    }
+    
     @staticmethod
     def calculate_scores(df):
         """BFCL 공식 점수 산출 방법에 따라 통계 계산"""
@@ -136,7 +145,7 @@ class BFCLScorer:
                 "group": BFCL_ALL_CATEGORIES.get(cat, {}).get("group", "UNKNOWN")
             }
         
-        # 2. 그룹별 평균 정확도
+        # 2. 그룹별 평균 정확도 (Unweighted)
         groups = {}
         for cat, data in scores.items():
             group = data["group"]
@@ -147,12 +156,26 @@ class BFCLScorer:
         group_scores = {group: sum(accs) / len(accs) if accs else 0 
                        for group, accs in groups.items()}
         
-        # 3. Overall 정확도 (unweighted average of all categories)
+        # 3. Overall 정확도 (Equal Weight - Subset Testing용)
         all_accuracies = [data["accuracy"] for data in scores.values()]
         overall_accuracy = sum(all_accuracies) / len(all_accuracies) if all_accuracies else 0
         
+        # 4. BFCL v4 Weighted Score (Full Benchmark용)
+        v4_weighted_score = 0.0
+        total_weight_used = 0.0
+        
+        for group, weight in BFCLScorer.V4_WEIGHTS.items():
+            if group in group_scores:
+                v4_weighted_score += group_scores[group] * weight
+                total_weight_used += weight
+        
+        # 가중치 정규화 (일부 그룹만 테스트한 경우)
+        if total_weight_used > 0:
+            v4_weighted_score = v4_weighted_score / total_weight_used * sum(BFCLScorer.V4_WEIGHTS.values())
+        
         return {
             "overall": overall_accuracy,
+            "v4_weighted": v4_weighted_score,
             "by_category": scores,
             "by_group": group_scores
         }
@@ -254,14 +277,34 @@ class ExcelReporter:
         
         # Overall Score (수식으로 계산)
         summary_data.append({
-            "지표 (Metric)": "전체 정확도 (Overall Accuracy)",
-            "값 (Value)": "FORMULA_OVERALL_ACC",  # 나중에 수식으로 교체
-            "설명 (Description)": "모든 카테고리의 비가중 평균 (BFCL 표준)"
+            "지표 (Metric)": "━━━ 전체 점수 (Overall Scores) ━━━",
+            "값 (Value)": " ",
+            "설명 (Description)": " "
         })
         summary_data.append({
-            "지표 (Metric)": "📊 점수 산출 공식",
+            "지표 (Metric)": "전체 정확도 (Overall Accuracy)",
+            "값 (Value)": "FORMULA_OVERALL_ACC",  # 나중에 수식으로 교체
+            "설명 (Description)": "모든 카테고리의 비가중 평균 (Subset Testing용)"
+        })
+        summary_data.append({
+            "지표 (Metric)": "  └─ 📊 산출 공식",
             "값 (Value)": "Σ(Category Acc) / N",
-            "설명 (Description)": "N = 카테고리 수, 각 카테고리에 동일한 가중치 부여"
+            "설명 (Description)": "N = 카테고리 수, Equal Weight"
+        })
+        summary_data.append({
+            "지표 (Metric)": " ",
+            "값 (Value)": " ",
+            "설명 (Description)": " "
+        })
+        summary_data.append({
+            "지표 (Metric)": "BFCL v4 가중 점수 (Weighted Score)",
+            "값 (Value)": "FORMULA_V4_WEIGHTED",  # 나중에 수식으로 교체
+            "설명 (Description)": "BFCL v4 공식 가중치 적용 (Full Benchmark용)"
+        })
+        summary_data.append({
+            "지표 (Metric)": "  └─ 📊 산출 공식",
+            "값 (Value)": "(Agentic×40% + Multi-Turn×30% + Live×10% + Non-Live×10% + Hallucination×10%)",
+            "설명 (Description)": "BFCL v4 Official Weighting"
         })
         summary_data.append({
             "지표 (Metric)": " ",
@@ -352,7 +395,7 @@ class ExcelReporter:
             
             # Excel 수식 삽입
             if cell_b.value and isinstance(cell_b.value, str):
-                # Overall Accuracy 수식
+                # Overall Accuracy 수식 (Equal Weight)
                 if cell_b.value == "FORMULA_OVERALL_ACC":
                     # 카테고리별 점수들의 평균 (퍼센트 값 추출, 소수점 첫째자리까지)
                     cat_start_row = cat_row_start + 1  # 섹션 헤더 다음 행부터
@@ -360,6 +403,33 @@ class ExcelReporter:
                     # 각 카테고리의 퍼센트 값 추출하여 평균
                     value_extracts = [f'VALUE(LEFT(B{r},FIND("%",B{r})-1))' for r in range(cat_start_row, cat_end_row + 1)]
                     cell_b.value = f'=ROUND(AVERAGE({",".join(value_extracts)}),1)&"%"'
+                
+                # BFCL v4 Weighted Score 수식
+                elif cell_b.value == "FORMULA_V4_WEIGHTED":
+                    # 그룹별 행 찾기
+                    group_row_map = {}
+                    current_row = group_row_start
+                    for group in sorted(set(scores['by_group'].keys())):
+                        group_row_map[group] = current_row
+                        current_row += 1
+                    
+                    # v4 가중치 적용: (그룹점수 × 가중치)의 합
+                    weighted_parts = []
+                    weight_sum_parts = []
+                    
+                    for group, weight in BFCLScorer.V4_WEIGHTS.items():
+                        if group in group_row_map:
+                            row = group_row_map[group]
+                            # 퍼센트 값 추출: VALUE(LEFT(B{row}, FIND("%", B{row})-1))
+                            weighted_parts.append(f'VALUE(LEFT(B{row},FIND("%",B{row})-1))*{weight}')
+                            weight_sum_parts.append(str(weight))
+                    
+                    if weighted_parts:
+                        numerator = "+".join(weighted_parts)
+                        denominator = "+".join(weight_sum_parts)
+                        cell_b.value = f'=ROUND(({numerator})/({denominator}),1)&"%"'
+                    else:
+                        cell_b.value = "N/A"
                 
                 # 그룹별 수식
                 elif cell_b.value.startswith("FORMULA_GROUP_"):
@@ -413,8 +483,8 @@ class ExcelReporter:
             # Value 컬럼 중앙 정렬
             cell_b.alignment = Alignment(horizontal='center', vertical='center')
             
-            # Overall Accuracy 강조
-            if "전체 정확도" in str(cell_a.value):
+            # Overall Scores 강조 (Equal Weight + V4 Weighted)
+            if "전체 정확도" in str(cell_a.value) or "가중 점수" in str(cell_a.value):
                 cell_a.font = Font(bold=True, size=11)
                 cell_b.font = Font(bold=True, color='2E7D32', size=12)
                 cell_b.alignment = Alignment(horizontal='center', vertical='center')
@@ -509,7 +579,9 @@ class ExcelReporter:
             {"구분 (Section)": "🔄 State + Response", "내용 (Content)": "Multi-turn은 state-based와 response-based 두 체커 모두 통과 필요"},
             {"구분 (Section)": " ", "내용 (Content)": " "},
             {"구분 (Section)": "━━━ 점수 산출 (Scoring) ━━━", "내용 (Content)": " "},
-            {"구분 (Section)": "📈 전체 정확도", "내용 (Content)": "Overall Accuracy = Σ(Category Accuracy) / N (모든 카테고리의 비가중 평균)"},
+            {"구분 (Section)": "📈 전체 정확도 (Equal Weight)", "내용 (Content)": "Overall Accuracy = Σ(Category Accuracy) / N (모든 카테고리의 비가중 평균, Subset Testing용)"},
+            {"구분 (Section)": "📈 BFCL v4 가중 점수", "내용 (Content)": "V4 Weighted = (Agentic×40% + Multi-Turn×30% + Live×10% + Non-Live×10% + Hallucination×10%) / 사용된 그룹 가중치 합"},
+            {"구분 (Section)": "  └─ 가중치 세부", "내용 (Content)": "Agentic: web_search, memory | Multi-Turn: multi_turn_* | Live: live_* | Non-Live: simple_*, multiple, parallel_* | Hallucination: irrelevance, live_*relevance"},
             {"구분 (Section)": "📊 카테고리 정확도", "내용 (Content)": "Category Accuracy = (PASS count / Total count) × 100%"},
             {"구분 (Section)": "📂 그룹 정확도", "내용 (Content)": "Group Accuracy = 동일 그룹 내 카테고리들의 평균 (Average of categories within same group)"},
             {"구분 (Section)": " ", "내용 (Content)": " "},

@@ -161,22 +161,94 @@ python run_multi_models.py
 
 ### 점수 산출 방식
 
+본 구현은 **Subset Testing** 환경에 최적화된 점수 계산을 사용합니다.
+
+#### Subset Testing (현재 구현)
+
 ```
 Overall Accuracy = Σ(Category Accuracy) / N
 ```
 
-- 모든 카테고리에 동일한 가중치 부여 (BFCL 표준)
+- **각 카테고리에 동일한 가중치 부여**
 - 카테고리별 정확도 = (PASS 개수 / 전체 개수) × 100%
+- **적용 시나리오**: 각 카테고리에서 동일한 샘플 수를 추출할 때 (예: 20개 × 5개 = 100개)
 
-## 🎯 지원 모델
+#### Full Benchmark (BFCL v4 공식 리더보드)
+
+**참고**: 전체 4,693개 테스트를 수행할 경우 BFCL v4 공식 가중치 적용:
+
+```
+Overall Score = (Agentic × 40%) + (Multi-Turn × 30%) + (Live × 10%) 
+              + (Non-Live × 10%) + (Hallucination × 10%)
+```
+
+| 그룹 | 가중치 | 카테고리 |
+|------|--------|---------|
+| Agentic | 40% | web_search, memory |
+| Multi-Turn | 30% | multi_turn_* (4개) |
+| Live | 10% | live_* (4개) |
+| Non-Live | 10% | simple_*, multiple, parallel (6개) |
+| Hallucination | 10% | irrelevance, live_irrelevance (2개) |
+
+**왜 Subset Testing에서는 Equal Weight를 사용할까?**
+
+- ✅ **공정성**: 각 카테고리에서 동일한 샘플 수를 뽑으므로 평등한 비교 가능
+- ✅ **단순성**: 카테고리 추가/제거 시 가중치 재계산 불필요
+- ✅ **일관성**: 샘플 수가 적을 때 더 안정적인 통계
+
+## 🎯 지원 모델 및 호환성
 
 OpenRouter를 통해 다음 모델들을 지원합니다:
 
-- Mistral (mistralai/mistral-small-3.2-24b-instruct) - 기본값
-- Claude (anthropic/claude-3-haiku, claude-3-sonnet 등)
-- GPT (openai/gpt-4o-mini, gpt-4o 등)
-- Llama (meta-llama/llama-3.3-70b-instruct 등)
-- Qwen (qwen/qwen3-next-80b-a3b 등)
+### ✅ 권장 모델 (Tool Calling 안정성 검증)
+
+| 모델 | Tool Calling | 비고 |
+|------|-------------|------|
+| **Qwen 계열** | ⭐⭐⭐ 최우수 | Structured JSON 특화 학습, 100% 성공률 |
+| qwen/qwen3-14b | ✅ 안정적 | 테스트 완료 (3/3, 100%) |
+| qwen/qwen-2.5-72b-instruct | ✅ 안정적 | 테스트 완료 (3/3, 100%) |
+| **Claude 계열** | ⭐⭐⭐ 최우수 | BFCL v4 상위권 (70.29-70.36%) |
+| anthropic/claude-3-5-sonnet | ✅ 안정적 | 프로덕션 권장 |
+| anthropic/claude-3-haiku | ✅ 안정적 | 비용 효율적 |
+| **GPT 계열** | ⭐⭐ 우수 | OpenAI 네이티브 포맷 |
+| openai/gpt-4o-mini | ✅ 안정적 | 빠르고 저렴 |
+| openai/gpt-4o | ✅ 안정적 | 최고 성능 |
+
+### ⚠️ 주의 필요 모델
+
+| 모델 | 상태 | 이슈 |
+|------|------|------|
+| **Llama 3.3 70B** | ⚠️ 불안정 | OpenRouter 포맷 변환 문제 |
+| meta-llama/llama-3.3-70b-instruct | ❌ 40% 성공률 | JSON arguments 잘림 현상 (`'{"'`) |
+
+### 📊 Llama vs Qwen: 왜 차이가 날까?
+
+**문제의 근본 원인:**
+
+Llama 3.3은 **자체 tool calling 포맷**을 사용하며, OpenRouter가 이를 OpenAI 호환 포맷으로 변환하는 과정에서 JSON이 손실됩니다.
+
+```
+Llama 네이티브: {"name": "func", "arguments": {...}}
+OpenAI 포맷:    {"type": "function", "function": {...}}
+                           ↑ 변환 실패 → '{"' 잘림
+```
+
+**Qwen이 우수한 이유:**
+- ✅ **Structured JSON 생성에 특화 학습** (공식 문서 명시)
+- ✅ OpenAI 호환 포맷을 **네이티브로 지원**
+- ✅ OpenRouter Response Healing: 87.97% → 99.98% (99.85% defect reduction)
+- ✅ 모든 프로바이더에서 **일관된 성능**
+
+**Llama 사용 시 해결 방법:**
+1. **직접 API 사용** (변환 없음):
+   - Groq: `https://api.groq.com/openai/v1`
+   - Together AI: `https://api.together.xyz/v1`
+   - Fireworks: `https://api.fireworks.ai/inference/v1`
+
+2. **OpenRouter Response Healing 활성화**:
+   ```python
+   "extra_body": {"transforms": ["response-healing"]}
+   ```
 
 전체 모델 목록: https://openrouter.ai/models
 
