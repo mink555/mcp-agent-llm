@@ -2,7 +2,7 @@
 """
 다중 모델 벤치마크 실행 스크립트
 
-20개 카테고리에 대해 샘플 3개씩 5개 모델을 순차 실행합니다.
+20개 카테고리에 대해 샘플 10개씩 5개 모델을 순차 실행합니다.
 """
 
 import os
@@ -26,8 +26,8 @@ def run_multi_model_benchmark():
     print("=" * 80)
     print(f"📋 테스트 모델 수: {len(MODELS_TO_TEST)}개")
     print(f"📂 카테고리 수: {len(BFCL_ALL_CATEGORIES)}개 (20개)")
-    print(f"📊 카테고리당 샘플: 3개")
-    print(f"🎯 총 예상 테스트: {len(MODELS_TO_TEST)} × {len(BFCL_ALL_CATEGORIES)} × 3 = {len(MODELS_TO_TEST) * len(BFCL_ALL_CATEGORIES) * 3}개")
+    print(f"📊 카테고리당 샘플: 10개")
+    print(f"🎯 총 예상 테스트: {len(MODELS_TO_TEST)} × {len(BFCL_ALL_CATEGORIES)} × 10 = {len(MODELS_TO_TEST) * len(BFCL_ALL_CATEGORIES) * 10}개")
     print("=" * 80)
     print("\n테스트할 모델 목록:")
     for i, model in enumerate(MODELS_TO_TEST, 1):
@@ -49,8 +49,8 @@ def run_multi_model_benchmark():
             **DEFAULT_CONFIG,
             "model_name": model_name,
             "categories": list(BFCL_ALL_CATEGORIES.keys()),  # 전체 20개 카테고리
-            "samples_per_cat": 3,  # 각 카테고리당 3개 샘플
-            "rate_limit_delay": 3
+            "samples_per_cat": 10,  # 각 카테고리당 10개 샘플
+            "rate_limit_delay": 0
         }
         
         try:

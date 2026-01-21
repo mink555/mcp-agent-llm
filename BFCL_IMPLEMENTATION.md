@@ -395,6 +395,6 @@ elif "multi_turn" in cat:
 ### 다중 모델 비교
 
 ```bash
-# 20개 카테고리 × 3개 샘플로 5개 모델 순차 실행
+# 20개 카테고리 × 10개 샘플로 5개 모델 순차 실행
 python run_multi_models.py
 ```

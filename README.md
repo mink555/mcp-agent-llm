@@ -112,7 +112,7 @@ python main.py --model "anthropic/claude-3-haiku" --quick
 # 대기 시간을 줄여서 빠르게 실행
 python main.py --quick --delay 1
 
-# 다중 모델 순차 실행 (20개 카테고리 × 3개 샘플 × 5개 모델 = 300개 테스트)
+# 다중 모델 순차 실행 (20개 카테고리 × 10개 샘플 × 5개 모델 = 1,000개 테스트)
 python run_multi_models.py
 ```
 
