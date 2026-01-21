@@ -63,6 +63,26 @@ python main.py --quick --model "anthropic/claude-3-haiku"
 python main.py --quick --model "mistralai/mistral-large"
 ```
 
+### 대기 시간 조정
+
+API 레이트 리밋을 고려하여 카테고리 간 대기 시간을 조정할 수 있습니다.
+
+```bash
+# 대기 시간을 1초로 줄여서 빠르게 실행
+python main.py --quick --delay 1
+
+# 대기 시간 없이 실행 (레이트 리밋이 없는 경우)
+python main.py --delay 0
+
+# 대기 시간을 10초로 늘려서 안전하게 실행
+python main.py --full --delay 10
+```
+
+**기본값:**
+- `--quick`: 5초
+- `--full`: 3초
+- 기본 모드: 3초
+
 ### 조합 예시
 
 ```bash
