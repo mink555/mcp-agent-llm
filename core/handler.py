@@ -82,9 +82,10 @@ class ModelHandler:
                 raw_args = tc.function.arguments
                 
                 # 빈 arguments 또는 불완전한 JSON 확인
-                if not raw_args or raw_args.strip() in ["{", "{\"", "{\""]:
+                if not raw_args or raw_args.strip() in ["{", "{\"", "\"", "", "None", "null"]:
                     print(f"⚠️ Empty or incomplete arguments for {orig_name}")
                     print(f"   Raw arguments: '{raw_args}'")
+                    print(f"   → Using empty dict {{}}")
                     decoded_output.append({orig_name: {}})
                     continue
                 

@@ -686,7 +686,20 @@ Your goal is to successfully call the right functions with the right parameters.
 
             if ast_out:
                 all_model_calls.extend(ast_out)
-                messages.append(res["msg_obj"]) # 어시스턴트 메시지 추가
+                
+                # msg_obj를 dict로 변환하고 tool_calls arguments 검증/수정
+                msg_dict = res["msg_obj"].model_dump()
+                
+                # DeepInfra 등 엄격한 provider를 위한 arguments sanitization
+                if msg_dict.get("tool_calls"):
+                    for tc in msg_dict["tool_calls"]:
+                        if tc.get("function"):
+                            args = tc["function"].get("arguments", "")
+                            # 빈 값, 'None', 'null' 등을 "{}"로 강제 치환
+                            if not args or str(args).strip() in ["", "None", "null", "''", '""']:
+                                tc["function"]["arguments"] = "{}"
+                
+                messages.append(msg_dict) # 검증된 어시스턴트 메시지 추가
                 
                 # 도구 실행 및 결과 추가
                 for i, call in enumerate(ast_out):
