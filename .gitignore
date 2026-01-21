@@ -17,7 +17,10 @@ goex/exec_engine/credentials/*
 goex/docker/*/requirements.txt
 goex/docker/misc/images.json
 
-################## Berkley Function Call Leaderboard ##########################
+################## Berkeley Function Call Leaderboard ##########################
+
+# Ignore all Python files (we only need the JSON data files)
+berkeley-function-call-leaderboard/**/*.py
 
 # Ignore inference results
 berkeley-function-call-leaderboard/result/

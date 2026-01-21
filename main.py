@@ -876,7 +876,7 @@ def main():
     parser.add_argument(
         "--quick", 
         action="store_true",
-        help="빠른 테스트 모드 (2개 카테고리, 각 2개 샘플)"
+        help="빠른 테스트 모드 (3개 카테고리, 각 2개 샘플 = 6개)"
     )
     
     parser.add_argument(
@@ -900,7 +900,7 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        help="사용할 모델 이름 (기본값: mistral-small-3.1)"
+        help="사용할 모델 이름 (기본값: mistralai/mistral-small-3.2-24b-instruct)"
     )
     
     parser.add_argument(

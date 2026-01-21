@@ -13,7 +13,7 @@ class ModelHandler:
         self.model_name = model_name
         self.name_map = {} # 치환된 이름 보관용
 
-    def inference(self, messages, tools=None, temperature=0, force_tool=False):
+    def inference(self, messages, tools=None, temperature=0, force_tool=False, max_tokens=4096):
         """다이어그램의 handler.inference(data) 단계"""
         start_time = time.time()
         sanitized_tools = self._prepare_tools(tools)
@@ -27,6 +27,7 @@ class ModelHandler:
                     "model": self.model_name,
                     "messages": messages,
                     "temperature": temperature,
+                    "max_tokens": max_tokens,  # JSON 응답이 잘리는 것 방지
                     "extra_body": {
                         "include_reasoning": True,
                         "include_thought": True,
@@ -76,28 +77,56 @@ class ModelHandler:
         
         if msg.tool_calls:
             for tc in msg.tool_calls:
+                san_name = tc.function.name
+                orig_name = self.name_map.get(san_name, san_name)
+                raw_args = tc.function.arguments
+                
+                # 빈 arguments 또는 불완전한 JSON 확인
+                if not raw_args or raw_args.strip() in ["{", "{\"", "{\""]:
+                    print(f"⚠️ Empty or incomplete arguments for {orig_name}")
+                    print(f"   Raw arguments: '{raw_args}'")
+                    decoded_output.append({orig_name: {}})
+                    continue
+                
                 try:
-                    san_name = tc.function.name
-                    orig_name = self.name_map.get(san_name, san_name)
-                    args = json.loads(tc.function.arguments)
+                    args = json.loads(raw_args)
                     decoded_output.append({orig_name: args})
                 except json.JSONDecodeError as e:
-                    # JSON 파싱 실패 시 빈 딕셔너리로 처리
-                    print(f"⚠️ JSON Decode Error for {tc.function.name}: {str(e)[:100]}")
-                    print(f"   Raw arguments: {tc.function.arguments[:200]}")
-                    # 문자열을 파싱 시도
+                    # JSON 파싱 실패 시 복구 시도
+                    print(f"⚠️ JSON Decode Error for {orig_name}: {str(e)[:100]}")
+                    print(f"   Raw arguments: {raw_args[:200]}")
+                    
+                    # 여러 복구 전략 시도
+                    fixed_args = None
+                    
+                    # 1. 작은따옴표를 큰따옴표로 변환
                     try:
-                        # 작은따옴표를 큰따옴표로 변환 후 재시도
-                        fixed_args = tc.function.arguments.replace("'", '"')
+                        fixed_args = raw_args.replace("'", '"')
                         args = json.loads(fixed_args)
-                        decoded_output.append({tc.function.name: args})
+                        decoded_output.append({orig_name: args})
+                        continue
                     except:
-                        # 완전히 실패하면 빈 딕셔너리
-                        decoded_output.append({tc.function.name: {}})
+                        pass
+                    
+                    # 2. 불완전한 JSON 완성 시도 (마지막 }가 없는 경우)
+                    try:
+                        if raw_args.strip().endswith(',') or not raw_args.strip().endswith('}'):
+                            fixed_args = raw_args.rstrip(',').rstrip() + '}'
+                            args = json.loads(fixed_args)
+                            print(f"   ✅ Recovered by adding closing brace")
+                            decoded_output.append({orig_name: args})
+                            continue
+                    except:
+                        pass
+                    
+                    # 완전히 실패하면 빈 딕셔너리
+                    print(f"   ❌ Could not recover, using empty dict")
+                    decoded_output.append({orig_name: {}})
+                    
                 except Exception as e:
                     # 기타 에러 발생 시 로그 출력 및 빈 딕셔너리
-                    print(f"⚠️ Decode AST Error: {e}")
-                    decoded_output.append({tc.function.name: {}})
+                    print(f"⚠️ Decode AST Error for {orig_name}: {e}")
+                    decoded_output.append({orig_name: {}})
         return decoded_output
 
     def decode_executable(self, inference_result):

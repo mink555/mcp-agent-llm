@@ -182,7 +182,11 @@ class BFCLChecker:
             
             if not found_match:
                 all_pass = False
-                g_func = list(g_call.keys())[0]
+                # g_call이 문자열인 경우 처리
+                if isinstance(g_call, str):
+                    g_func = g_call.split('(')[0] if '(' in g_call else g_call
+                else:
+                    g_func = list(g_call.keys())[0] if isinstance(g_call, dict) else str(g_call)
                 results.append(f"GT {i}: ❌ Required call '{g_func}' not found")
         
         if all_pass:
@@ -222,7 +226,11 @@ class BFCLChecker:
             
             if not found_match:
                 all_pass = False
-                g_func = list(g_call.keys())[0]
+                # g_call이 문자열인 경우 처리
+                if isinstance(g_call, str):
+                    g_func = g_call.split('(')[0] if '(' in g_call else g_call
+                else:
+                    g_func = list(g_call.keys())[0] if isinstance(g_call, dict) else str(g_call)
                 results.append(f"GT {i}: ❌ No match found for {g_func}")
         
         return all_pass, "\n".join(results)
@@ -230,6 +238,39 @@ class BFCLChecker:
     @staticmethod
     def _single_call_checker(m_call, g_call, index):
         """단일 함수 호출 검증"""
+        # 타입 검증: g_call이 문자열인 경우 처리 (multi_turn 문자열 형식)
+        if isinstance(g_call, str):
+            # GT가 문자열이면 모델 출력도 문자열로 변환하여 비교
+            if isinstance(m_call, dict):
+                # {"function_name": {"param": "value"}} -> "function_name(param='value')"
+                m_func = list(m_call.keys())[0]
+                m_params = m_call[m_func]
+                if isinstance(m_params, dict):
+                    param_strs = [f"{k}={repr(v)}" for k, v in m_params.items()]
+                    m_call_str = f"{m_func}({','.join(param_strs)})"
+                else:
+                    m_call_str = f"{m_func}({m_params})"
+            elif isinstance(m_call, str):
+                m_call_str = m_call
+            else:
+                return {
+                    "valid": False,
+                    "message": f"Step {index}: ❌ Invalid model call format (expected dict or str, got {type(m_call).__name__})"
+                }
+            
+            # GT 문자열에서 함수명 추출
+            g_func = g_call.split('(')[0] if '(' in g_call else g_call
+            m_func = m_call_str.split('(')[0] if '(' in m_call_str else m_call_str
+            
+            # 함수명이 일치하면 매칭으로 간주 (파라미터는 유연하게)
+            if g_func.lower() == m_func.lower():
+                return {"valid": True, "message": f"Step {index}: ✅ '{g_func}' matched"}
+            else:
+                return {
+                    "valid": False,
+                    "message": f"Step {index}: ❌ Function mismatch ({m_func} vs {g_func})"
+                }
+        
         # 타입 검증: m_call이 딕셔너리가 아닌 경우 처리
         if not isinstance(m_call, dict):
             return {
@@ -241,6 +282,13 @@ class BFCLChecker:
             return {
                 "valid": False,
                 "message": f"Step {index}: ❌ Empty call"
+            }
+        
+        # g_call도 딕셔너리가 아닌 경우 처리
+        if not isinstance(g_call, dict):
+            return {
+                "valid": False,
+                "message": f"Step {index}: ❌ Invalid ground truth format (expected dict, got {type(g_call).__name__})"
             }
         
         m_func = list(m_call.keys())[0]
