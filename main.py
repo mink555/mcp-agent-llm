@@ -757,8 +757,13 @@ def run_benchmark(config):
     print("=" * 80)
 
     start_time = time.time()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    mode_tag = "QUICK" if config["samples_per_cat"] <= 2 else "FULL"
+    model_short = _format_model_name_for_filename(config["model_name"])
+    os.makedirs("results", exist_ok=True)
     
     for cat_idx, cat in enumerate(config["categories"], 1):
+        cat_results = []
         print(f"\n[{cat_idx}/{len(config['categories'])}] 📂 Category: {cat}")
         questions, answers = loader.load_dataset(cat, limit=config["samples_per_cat"])
         
@@ -776,34 +781,36 @@ def run_benchmark(config):
                     max_steps=config["max_agent_steps"]
                 )
                 all_results.append(result)
+                cat_results.append(result)
                 status = "✅" if result["결과"] == "PASS" else "❌"
                 print(f"{status} ({result['Latency']:.0f}ms)")
             except Exception as e:
                 print(f"❌ ERROR: {str(e)[:50]}")
                 continue
         
+        # 카테고리별 결과 저장
+        if cat_results:
+            cat_df = pd.DataFrame(cat_results)
+            report_path = f"results/BFCL_{mode_tag}_{model_short}_{cat}_Report_{timestamp}.xlsx"
+            ExcelReporter.save(cat_df, report_path, config["model_name"], config)
+            
+            cat_pass = len(cat_df[cat_df['결과'] == 'PASS'])
+            cat_total = len(cat_df)
+            cat_acc = (cat_pass / cat_total * 100) if cat_total > 0 else 0
+            print(f"  💾 저장됨: {report_path} ({cat_pass}/{cat_total}, {cat_acc:.1f}%)")
+        
         # 레이트 리밋 방지 대기 (마지막 카테고리는 제외)
         if cat_idx < len(config["categories"]):
             print(f"  ⏳ {config['rate_limit_delay']}초 대기 중...")
             time.sleep(config["rate_limit_delay"])
 
-    # 결과 저장
+    # 전체 결과 통계
     if not all_results:
         print("\n❌ 결과가 없습니다. 벤치마크를 확인해주세요.")
         return None
     
-    df = pd.DataFrame(all_results)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    mode_tag = "QUICK" if config["samples_per_cat"] <= 2 else "FULL"
-    
-    # 모델명을 약식으로 변환 (파일명용)
-    model_short = _format_model_name_for_filename(config["model_name"])
-    
-    report_path = f"results/BFCL_{mode_tag}_{model_short}_Report_{timestamp}.xlsx"
-    os.makedirs("results", exist_ok=True)
-    ExcelReporter.save(df, report_path, config["model_name"], config)
-    
     elapsed = time.time() - start_time
+    df = pd.DataFrame(all_results)
     pass_count = len(df[df['결과'] == 'PASS'])
     total_count = len(df)
     accuracy = (pass_count / total_count * 100) if total_count > 0 else 0
@@ -815,10 +822,10 @@ def run_benchmark(config):
     print(f"✅ PASS: {pass_count}개 ({accuracy:.1f}%)")
     print(f"❌ FAIL: {total_count - pass_count}개")
     print(f"⏱️  소요 시간: {elapsed:.1f}초")
-    print(f"💾 저장 위치: {report_path}")
+    print(f"📁 저장 폴더: results/ ({len(config['categories'])}개 파일)")
     print("=" * 80)
     
-    return report_path
+    return f"results/BFCL_{mode_tag}_{model_short}_*_Report_{timestamp}.xlsx"
 
 def main():
     """메인 실행 함수"""
