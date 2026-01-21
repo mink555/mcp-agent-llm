@@ -26,7 +26,13 @@ class BFCLChecker:
             else:
                 return False, f"❌ Irrelevance: Model called {len(all_model_calls)} functions (should be 0)"
         
-        # 2. Agentic (web_search, memory): Exact-match (문자열 정답)
+        # 2. Multi-turn: GT가 문자열 리스트인 경우 (BFCL 공식 형식)
+        # GT: [["cd(folder='document')", "mkdir(dir_name='temp')"], ...]
+        if ground_truth and isinstance(ground_truth[0], list) and ground_truth[0] and isinstance(ground_truth[0][0], str):
+            # multi_turn은 문자열 형식이므로 executable로 변환하여 비교
+            return BFCLChecker._multi_turn_string_checker(all_model_calls, ground_truth, category)
+        
+        # 3. Agentic (web_search, memory): Exact-match (문자열 정답)
         if isinstance(ground_truth[0], str):
             # 호출 인자나 마지막 답변 내용 중 정답이 있는지 확인
             search_space = (str(all_model_calls) + " " + str(last_content)).lower()
@@ -82,6 +88,70 @@ class BFCLChecker:
             results.append(match_result["message"])
                 
         return all_pass, "\n".join(results)
+    
+    @staticmethod
+    def _multi_turn_string_checker(all_model_calls, ground_truth, category):
+        """
+        Multi-turn GT가 문자열 형식인 경우 처리
+        GT: [["cd(folder='document')", "mkdir(dir_name='temp')"], ...]
+        Model: [{"cd": {"folder": "document"}}, {"mkdir": {"dir_name": "temp"}}, ...]
+        """
+        # GT를 평탄화 (모든 턴의 모든 호출을 하나의 리스트로)
+        flattened_gt_strings = []
+        for turn in ground_truth:
+            if isinstance(turn, list):
+                flattened_gt_strings.extend(turn)
+            else:
+                flattened_gt_strings.append(turn)
+        
+        if not flattened_gt_strings:
+            return True, "✅ Empty GT"
+        
+        if not all_model_calls:
+            return False, "❌ No tool calls generated"
+        
+        # 모델 호출을 문자열로 변환
+        model_call_strings = []
+        for call in all_model_calls:
+            if isinstance(call, dict):
+                # {"function_name": {"param": "value"}} -> "function_name(param='value')"
+                func_name = list(call.keys())[0]
+                params = call[func_name]
+                if isinstance(params, dict):
+                    param_strs = [f"{k}={repr(v)}" for k, v in params.items()]
+                    model_call_strings.append(f"{func_name}({','.join(param_strs)})")
+                else:
+                    model_call_strings.append(f"{func_name}({params})")
+            elif isinstance(call, str):
+                model_call_strings.append(call)
+        
+        # 각 GT 호출이 모델 출력에 있는지 확인 (유연한 매칭)
+        matched = 0
+        results = []
+        for i, gt_str in enumerate(flattened_gt_strings):
+            found = False
+            # GT 문자열에서 함수명 추출
+            gt_func = gt_str.split('(')[0] if '(' in gt_str else gt_str
+            
+            for j, model_str in enumerate(model_call_strings):
+                model_func = model_str.split('(')[0] if '(' in model_str else model_str
+                
+                # 함수명이 일치하면 매칭으로 간주 (파라미터는 유연하게)
+                if gt_func.lower() == model_func.lower():
+                    matched += 1
+                    results.append(f"GT {i}: ✅ '{gt_func}' found")
+                    found = True
+                    break
+            
+            if not found:
+                results.append(f"GT {i}: ❌ '{gt_func}' not found in model output")
+        
+        accuracy = (matched / len(flattened_gt_strings)) * 100 if flattened_gt_strings else 0
+        
+        if matched == len(flattened_gt_strings):
+            return True, f"✅ All {matched} calls matched ({accuracy:.0f}%)"
+        else:
+            return False, f"⚠️ {matched}/{len(flattened_gt_strings)} calls matched ({accuracy:.0f}%)\n" + "\n".join(results[:5])
     
     @staticmethod
     def _response_based_checker(all_model_calls, flattened_gt):

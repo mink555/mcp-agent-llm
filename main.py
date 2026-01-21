@@ -3,6 +3,7 @@ import json
 import time
 import argparse
 import pandas as pd
+import traceback
 from datetime import datetime
 from dotenv import load_dotenv
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -792,6 +793,8 @@ def run_benchmark(config):
                 print(f"{status} ({result['Latency']:.0f}ms)")
             except Exception as e:
                 print(f"❌ ERROR: {str(e)[:50]}")
+                print(f"   Full traceback:")
+                traceback.print_exc()
                 continue
         
         # 카테고리별 결과 저장
