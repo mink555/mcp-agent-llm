@@ -15,7 +15,7 @@ MODELS_TO_TEST = [
     "meta-llama/llama-3.3-70b-instruct",
     "mistralai/mistral-small-3.2-24b-instruct",
     "qwen/qwen3-32b",
-    "qwen/qwen3-14b",
+    "qwen/qwen3-14b",  # 주의: "Paid model training" 정책 필요. Privacy 설정 확인: https://openrouter.ai/settings/privacy
     "qwen/qwen3-next-80b-a3b-instruct",
 ]
 

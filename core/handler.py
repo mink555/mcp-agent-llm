@@ -29,7 +29,9 @@ class ModelHandler:
                     "temperature": temperature,
                     "extra_body": {
                         "include_reasoning": True,
-                        "include_thought": True
+                        "include_thought": True,
+                        # OpenRouter: provider fallback 활성화
+                        "route": "fallback"
                     }
                 }
                 if sanitized_tools:
@@ -54,12 +56,18 @@ class ModelHandler:
                     "tokens": response.usage.total_tokens if response.usage else 0
                 }
             except Exception as e:
-                if "429" in str(e) and attempt < max_retries - 1:
-                    print(f"⚠️ Rate limited. Retrying in {retry_delay}s... (Attempt {attempt + 1}/{max_retries})")
+                error_str = str(e)
+                # 429 (Rate limit) 또는 404 (Provider unavailable) 에러는 재시도
+                if (("429" in error_str or "404" in error_str) and attempt < max_retries - 1):
+                    error_type = "Rate limited" if "429" in error_str else "Provider unavailable (404)"
+                    print(f"⚠️ {error_type}. Retrying in {retry_delay}s... (Attempt {attempt + 1}/{max_retries})")
                     time.sleep(retry_delay)
                     retry_delay *= 2 # Exponential backoff
                     continue
-                raise Exception(f"Inference Failed: {str(e)}")
+                # 마지막 시도 실패 또는 재시도 불가능한 에러
+                if "404" in error_str:
+                    raise Exception(f"Inference Failed: Model '{self.model_name}' not available. All providers returned 404. Full error: {error_str}")
+                raise Exception(f"Inference Failed: {error_str}")
 
     def decode_ast(self, inference_result):
         """다이어그램의 handler.decode_ast(model_output) 단계"""
