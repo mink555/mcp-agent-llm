@@ -123,7 +123,6 @@ OpenRouter를 통해 다음 모델들을 지원합니다:
 
 - [USAGE.md](USAGE.md): 상세 사용법
 - [BFCL_IMPLEMENTATION.md](BFCL_IMPLEMENTATION.md): 구현 상세
-- [VERIFICATION_REPORT.md](VERIFICATION_REPORT.md): 검증 리포트
 - [README_SETUP.md](README_SETUP.md): 환경 설정 가이드
 
 ## 🔗 참고 자료

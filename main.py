@@ -123,9 +123,9 @@ class BFCLScorer:
         scores = {}
         
         # 1. 카테고리별 정확도
-        for cat in df['카테고리'].unique():
-            cat_df = df[df['카테고리'] == cat]
-            pass_count = len(cat_df[cat_df['결과'] == 'PASS'])
+        for cat in df['Category'].unique():
+            cat_df = df[df['Category'] == cat]
+            pass_count = len(cat_df[cat_df['Result'] == 'PASS'])
             total_count = len(cat_df)
             accuracy = (pass_count / total_count * 100) if total_count > 0 else 0
             scores[cat] = {
@@ -229,10 +229,10 @@ class ExcelReporter:
         
         # 카테고리별 행 번호 매핑 (Detailed Results 시트 참조용)
         category_rows = {}
-        for idx, cat in enumerate(df['카테고리'].unique()):
+        for idx, cat in enumerate(df['Category'].unique()):
             # Excel은 1-based, 헤더가 1행이므로 데이터는 2행부터
-            cat_df = df[df['카테고리'] == cat]
-            first_row = df[df['카테고리'] == cat].index[0] + 2  # +2 for Excel indexing
+            cat_df = df[df['Category'] == cat]
+            first_row = df[df['Category'] == cat].index[0] + 2  # +2 for Excel indexing
             last_row = first_row + len(cat_df) - 1
             category_rows[cat] = (first_row, last_row)
         
@@ -667,11 +667,16 @@ Your goal is to successfully call the right functions with the right parameters.
         
         # 에이전트 루프 (멀티홉 처리)
         for step in range(max_steps):
+            # Multi-turn: 모델이 자율적으로 도구 호출 여부 결정 (tool_choice="auto")
+            # Single-turn: tool_choice="required" 사용하여 도구 호출 강제
+            is_multi_turn = "multi_turn" in cat or cat in ["web_search", "memory"]
+            force_tool_call = not is_multi_turn and cat not in ["irrelevance", "live_irrelevance", "live_relevance"]
+            
             res = handler.inference(
                 messages=[{"role": "system", "content": SYSTEM_PROMPT}] + messages,
                 tools=tools,
                 temperature=0,
-                force_tool=(cat not in ["irrelevance", "multi_turn_miss_func"])
+                force_tool=force_tool_call
             )
             
             final_res = res
@@ -714,11 +719,11 @@ Your goal is to successfully call the right functions with the right parameters.
     is_pass, detail = checker.ast_checker(all_model_calls, gt, final_content, cat)
     
     return {
-        "카테고리": cat, "ID": test_id, "결과": "PASS" if is_pass else "FAIL",
-        "질문": str(user_turns[0][0]['content']), "검증 상세": detail,
-        "사고과정": final_res["thinking"] if final_res else "N/A",
-        "누적 호출(AST)": json.dumps(all_model_calls, ensure_ascii=False),
-        "정답(GT)": json.dumps(gt, ensure_ascii=False),
+        "Category": cat, "ID": test_id, "Result": "PASS" if is_pass else "FAIL",
+        "Question": str(user_turns[0][0]['content']), "Verification": detail,
+        "Thinking": final_res["thinking"] if final_res else "N/A",
+        "Model_Calls": json.dumps(all_model_calls, ensure_ascii=False),
+        "Ground_Truth": json.dumps(gt, ensure_ascii=False),
         "Latency": final_res["latency"] if final_res else 0
     }
 
@@ -783,7 +788,7 @@ def run_benchmark(config):
                 )
                 all_results.append(result)
                 cat_results.append(result)
-                status = "✅" if result["결과"] == "PASS" else "❌"
+                status = "✅" if result["Result"] == "PASS" else "❌"
                 print(f"{status} ({result['Latency']:.0f}ms)")
             except Exception as e:
                 print(f"❌ ERROR: {str(e)[:50]}")
@@ -796,7 +801,7 @@ def run_benchmark(config):
             ExcelReporter.save(cat_df, report_path, config["model_name"], config)
             saved_files.append(report_path)  # 나중에 삭제하기 위해 경로 저장
             
-            cat_pass = len(cat_df[cat_df['결과'] == 'PASS'])
+            cat_pass = len(cat_df[cat_df['Result'] == 'PASS'])
             cat_total = len(cat_df)
             cat_acc = (cat_pass / cat_total * 100) if cat_total > 0 else 0
             print(f"  💾 저장됨: {report_path} ({cat_pass}/{cat_total}, {cat_acc:.1f}%)")
@@ -813,7 +818,7 @@ def run_benchmark(config):
     
     elapsed = time.time() - start_time
     df = pd.DataFrame(all_results)
-    pass_count = len(df[df['결과'] == 'PASS'])
+    pass_count = len(df[df['Result'] == 'PASS'])
     total_count = len(df)
     accuracy = (pass_count / total_count * 100) if total_count > 0 else 0
     
