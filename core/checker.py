@@ -160,6 +160,19 @@ class BFCLChecker:
     @staticmethod
     def _single_call_checker(m_call, g_call, index):
         """단일 함수 호출 검증"""
+        # 타입 검증: m_call이 딕셔너리가 아닌 경우 처리
+        if not isinstance(m_call, dict):
+            return {
+                "valid": False,
+                "message": f"Step {index}: ❌ Invalid call format (expected dict, got {type(m_call).__name__})"
+            }
+        
+        if not m_call:
+            return {
+                "valid": False,
+                "message": f"Step {index}: ❌ Empty call"
+            }
+        
         m_func = list(m_call.keys())[0]
         g_func = list(g_call.keys())[0]
         
@@ -175,6 +188,14 @@ class BFCLChecker:
             
         m_params = m_call[m_func]
         g_params = g_call[g_func]
+        
+        # m_params가 딕셔너리가 아닌 경우 처리
+        if not isinstance(m_params, dict):
+            return {
+                "valid": False,
+                "message": f"Step {index}: ❌ Invalid params format (expected dict, got {type(m_params).__name__})"
+            }
+        
         param_errors = []
         
         for p_name, p_allowed in g_params.items():

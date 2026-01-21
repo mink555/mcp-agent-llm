@@ -81,13 +81,23 @@ class ModelHandler:
                     orig_name = self.name_map.get(san_name, san_name)
                     args = json.loads(tc.function.arguments)
                     decoded_output.append({orig_name: args})
-                except json.JSONDecodeError:
-                    # JSON 파싱 실패 시 원본 문자열 유지
-                    decoded_output.append({tc.function.name: tc.function.arguments})
+                except json.JSONDecodeError as e:
+                    # JSON 파싱 실패 시 빈 딕셔너리로 처리
+                    print(f"⚠️ JSON Decode Error for {tc.function.name}: {str(e)[:100]}")
+                    print(f"   Raw arguments: {tc.function.arguments[:200]}")
+                    # 문자열을 파싱 시도
+                    try:
+                        # 작은따옴표를 큰따옴표로 변환 후 재시도
+                        fixed_args = tc.function.arguments.replace("'", '"')
+                        args = json.loads(fixed_args)
+                        decoded_output.append({tc.function.name: args})
+                    except:
+                        # 완전히 실패하면 빈 딕셔너리
+                        decoded_output.append({tc.function.name: {}})
                 except Exception as e:
-                    # 기타 에러 발생 시 로그 출력 및 원본 유지
+                    # 기타 에러 발생 시 로그 출력 및 빈 딕셔너리
                     print(f"⚠️ Decode AST Error: {e}")
-                    decoded_output.append({tc.function.name: tc.function.arguments})
+                    decoded_output.append({tc.function.name: {}})
         return decoded_output
 
     def decode_executable(self, inference_result):
