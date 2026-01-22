@@ -13,7 +13,7 @@ from main import run_benchmark, DEFAULT_CONFIG, BFCL_ALL_CATEGORIES
 
 # 테스트할 모델 목록 (기본값)
 DEFAULT_MODELS = [
-    # "meta-llama/llama-3.3-70b-instruct",  # Llama 제외
+    "meta-llama/llama-3.3-70b-instruct",
     "mistralai/mistral-small-3.2-24b-instruct",
     "qwen/qwen3-32b",
     "qwen/qwen3-14b",  # 주의: "Paid model training" 정책 필요. Privacy 설정 확인: https://openrouter.ai/settings/privacy
@@ -126,7 +126,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 사용 예시:
-  # 기본 실행 (20개 카테고리 × 10개 샘플 × 4개 모델)
+  # 기본 실행 (20개 카테고리 × 10개 샘플 × 5개 모델)
   python run_multi_models.py
   
   # 샘플 5개씩, delay 1초로 실행
@@ -157,7 +157,7 @@ def main():
     parser.add_argument(
         "--models",
         nargs="+",
-        help="테스트할 모델 리스트 (기본값: 4개 모델)"
+        help="테스트할 모델 리스트 (기본값: 5개 모델)"
     )
     
     args = parser.parse_args()
