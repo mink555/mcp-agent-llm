@@ -12,12 +12,13 @@ from datetime import datetime
 from main import run_benchmark, DEFAULT_CONFIG, BFCL_ALL_CATEGORIES
 
 # 테스트할 모델 목록 (기본값)
+# BFCL 표준 tool calling 지원 모델들
 DEFAULT_MODELS = [
-    "meta-llama/llama-3.3-70b-instruct",
     "mistralai/mistral-small-3.2-24b-instruct",
     "qwen/qwen3-32b",
-    "qwen/qwen3-14b",  # 주의: "Paid model training" 정책 필요. Privacy 설정 확인: https://openrouter.ai/settings/privacy
+    "qwen/qwen3-14b",
     "qwen/qwen3-next-80b-a3b-instruct",
+    "meta-llama/llama-3.1-70b-instruct",        # Llama 3.1 70B: BFCL v2 검증 (0.741 점수), OpenRouter 안정
 ]
 
 def run_multi_model_benchmark(samples_per_cat=10, rate_limit_delay=0, models=None):

@@ -240,51 +240,53 @@ OpenRouter를 통해 다음 모델들을 지원합니다:
 
 | 모델 | Tool Calling | 비고 |
 |------|-------------|------|
-| **Qwen 계열** | ⭐⭐⭐ 최우수 | Structured JSON 특화 학습, 100% 성공률 |
-| qwen/qwen3-14b | ✅ 안정적 | 테스트 완료 (3/3, 100%) |
-| qwen/qwen-2.5-72b-instruct | ✅ 안정적 | 테스트 완료 (3/3, 100%) |
+| **Qwen 계열** | ⭐⭐⭐ 최우수 | Structured JSON 특화 학습, 네이티브 OpenAI 호환 |
+| qwen/qwen3-14b | ✅ 안정적 | 테스트 완료, 권장 |
+| qwen/qwen-2.5-72b-instruct | ✅ 안정적 | 테스트 완료, 권장 |
 | **Claude 계열** | ⭐⭐⭐ 최우수 | BFCL v4 상위권 (70.29-70.36%) |
 | anthropic/claude-3-5-sonnet | ✅ 안정적 | 프로덕션 권장 |
 | anthropic/claude-3-haiku | ✅ 안정적 | 비용 효율적 |
 | **GPT 계열** | ⭐⭐ 우수 | OpenAI 네이티브 포맷 |
 | openai/gpt-4o-mini | ✅ 안정적 | 빠르고 저렴 |
 | openai/gpt-4o | ✅ 안정적 | 최고 성능 |
+| **Llama 계열** | ⭐⭐ 우수 | 공식 tool calling 지원 (BFCL 검증) |
+| meta-llama/llama-3.1-70b-instruct | ✅ 안정적 | OpenRouter 안정, 권장 |
+| mistralai/mistral-small-3.2-24b-instruct | ✅ 안정적 | 기본 모델, 권장 |
 
-### ⚠️ 주의 필요 모델
+### 📋 Tool Calling 방식 비교
 
-| 모델 | 상태 | 이슈 |
-|------|------|------|
-| **Llama 3.3 70B** | ⚠️ 불안정 | OpenRouter 포맷 변환 문제 |
-| meta-llama/llama-3.3-70b-instruct | ❌ 40% 성공률 | JSON arguments 잘림 현상 (`'{"'`) |
+| 모델 계열 | Tool Calling 방식 | OpenRouter 호환성 |
+|----------|------------------|-------------------|
+| **Qwen, Claude, GPT** | OpenAI 스타일 `tool_calls` | ✅ 네이티브 지원, 안정적 |
+| **Mistral** | OpenAI 스타일 `tool_calls` | ✅ 네이티브 지원, 안정적 |
+| **Llama 3.3 (via OpenRouter)** | OpenAI 스타일 `tool_calls` | ⚠️ **변환 불안정** (프로바이더별 차이) |
 
-### 📊 Llama vs Qwen: 왜 차이가 날까?
+### ⚠️ Llama 3.3 OpenRouter 이슈
 
-**문제의 근본 원인:**
-
-Llama 3.3은 **자체 tool calling 포맷**을 사용하며, OpenRouter가 이를 OpenAI 호환 포맷으로 변환하는 과정에서 JSON이 손실됩니다.
-
+**문제**: OpenRouter의 프로바이더 변환 과정에서 `arguments` 필드가 손실됩니다:
+```python
+# 기대: {"base": 5, "height": 3}
+# 실제: '{"'  ← JSON 잘림
 ```
-Llama 네이티브: {"name": "func", "arguments": {...}}
-OpenAI 포맷:    {"type": "function", "function": {...}}
-                           ↑ 변환 실패 → '{"' 잘림
-```
 
-**Qwen이 우수한 이유:**
-- ✅ **Structured JSON 생성에 특화 학습** (공식 문서 명시)
-- ✅ OpenAI 호환 포맷을 **네이티브로 지원**
-- ✅ OpenRouter Response Healing: 87.97% → 99.98% (99.85% defect reduction)
-- ✅ 모든 프로바이더에서 **일관된 성능**
+**원인**: 
+- Llama 3.3은 [네이티브 tool_calls를 지원](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct#tool-use-with-transformers)
+- OpenRouter의 일부 프로바이더가 변환에 실패
+- 성공률: 40-60% (프로바이더 라우팅에 따라 변동)
 
-**Llama 사용 시 해결 방법:**
-1. **직접 API 사용** (변환 없음):
-   - Groq: `https://api.groq.com/openai/v1`
+**권장 해결책**:
+1. **다른 모델 사용** (Qwen, Mistral 권장):
+   ```bash
+   python main.py --model "qwen/qwen3-14b" --quick
+   ```
+
+2. **직접 API 사용** (OpenRouter 우회):
+   - Groq: `https://api.groq.com/openai/v1` ([docs](https://console.groq.com/docs/tool-use))
    - Together AI: `https://api.together.xyz/v1`
    - Fireworks: `https://api.fireworks.ai/inference/v1`
 
-2. **OpenRouter Response Healing 활성화**:
-   ```python
-   "extra_body": {"transforms": ["response-healing"]}
-   ```
+3. **Llama 대안**:
+   - 다른 70B 모델: `qwen/qwen-2.5-72b-instruct` (더 안정적)
 
 전체 모델 목록: https://openrouter.ai/models
 
