@@ -255,13 +255,20 @@ OpenRouter를 통해 다음 모델들을 지원합니다:
 | meta-llama/llama-3.1-70b-instruct | ✅ 안정적 | OpenRouter 안정, 권장 |
 | mistralai/mistral-small-3.2-24b-instruct | ✅ 안정적 | 기본 모델, 권장 |
 
-### 📋 Tool Calling 방식 비교
+### 📋 BFCL 표준: 네이티브 Tool Calling만 사용
 
-| 모델 계열 | Tool Calling 방식 | OpenRouter 호환성 |
-|----------|------------------|-------------------|
-| **Qwen, Claude, GPT** | OpenAI 스타일 `tool_calls` | ✅ 네이티브 지원, 안정적 |
-| **Mistral** | OpenAI 스타일 `tool_calls` | ✅ 네이티브 지원, 안정적 |
-| **Llama 3.3 (via OpenRouter)** | OpenAI 스타일 `tool_calls` | ⚠️ **변환 불안정** (프로바이더별 차이) |
+**본 구현은 OpenAI 표준 `tool_calls` API만 지원합니다.**
+
+| 모델 계열 | OpenAI tool_calls 지원 | OpenRouter 안정성 |
+|----------|----------------------|------------------|
+| **Qwen** | ✅ 네이티브 | ✅ 완벽 |
+| **Claude** | ✅ 네이티브 | ✅ 완벽 |
+| **GPT** | ✅ 네이티브 | ✅ 완벽 |
+| **Mistral** | ✅ 네이티브 | ✅ 완벽 |
+| **Llama 3.1 70B** | ✅ 네이티브 | ✅ 안정적 |
+| **Llama 3.3 70B** | ✅ 네이티브 | ❌ 변환 실패 |
+
+> ⚠️ **중요**: Content 기반 파싱은 지원하지 않습니다. 모든 모델은 반드시 OpenAI 호환 `tool_calls` 필드를 반환해야 합니다.
 
 ### 🦙 Llama 모델 선택 가이드: 왜 3.1인가?
 
