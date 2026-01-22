@@ -174,8 +174,14 @@ python main.py --model "anthropic/claude-3-haiku" --quick
 # 대기 시간을 줄여서 빠르게 실행
 python main.py --quick --delay 1
 
-# 다중 모델 순차 실행 (20개 카테고리 × 10개 샘플 × 5개 모델 = 1,000개 테스트)
+# 다중 모델 순차 실행 (20개 카테고리 × 10개 샘플 × 4개 모델)
 python run_multi_models.py
+
+# 샘플 5개씩, delay 1초로 다중 모델 실행
+python run_multi_models.py --samples 5 --delay 1
+
+# 특정 모델만 테스트
+python run_multi_models.py --models "openai/gpt-4o-mini" "anthropic/claude-3-haiku" --samples 3
 ```
 
 ## 📈 결과 확인
