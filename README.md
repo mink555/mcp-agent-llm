@@ -190,10 +190,12 @@ python run_multi_models.py --models "openai/gpt-4o-mini" "anthropic/claude-3-hai
 
 ### 리포트 구성 (4개 시트)
 
-1. **Detailed Results**: 각 테스트의 상세 결과
-2. **Summary (BFCL)**: 카테고리별/그룹별 통계 (Excel 수식으로 자동 계산)
-3. **Dataset Info**: 데이터셋 정보 및 카테고리 설명
-4. **Reference**: BFCL 공식 참고 자료
+| 시트 | 내용 |
+|------|------|
+| **1. Detailed Results** | 각 테스트의 상세 결과 (Category, ID, Result, Question, Verification, Thinking, Model_Calls, Ground_Truth, Latency) |
+| **2. Summary (BFCL)** | BFCL 공식 통계 (Overall Accuracy, BFCL v4 Weighted Score, Group Scores, Category Scores) - Excel 수식으로 자동 계산 |
+| **3. Dataset Info** | 20개 카테고리 정보 (샘플 수, 그룹, 난이도, 설명) |
+| **4. Reference** | BFCL 공식 문서, 평가 방법, 논문 링크 |
 
 ### 점수 산출 방식
 
@@ -261,32 +263,48 @@ OpenRouter를 통해 다음 모델들을 지원합니다:
 | **Mistral** | OpenAI 스타일 `tool_calls` | ✅ 네이티브 지원, 안정적 |
 | **Llama 3.3 (via OpenRouter)** | OpenAI 스타일 `tool_calls` | ⚠️ **변환 불안정** (프로바이더별 차이) |
 
-### ⚠️ Llama 3.3 OpenRouter 이슈
+### 🦙 Llama 모델 선택 가이드: 왜 3.1인가?
 
-**문제**: OpenRouter의 프로바이더 변환 과정에서 `arguments` 필드가 손실됩니다:
-```python
-# 기대: {"base": 5, "height": 3}
-# 실제: '{"'  ← JSON 잘림
+| 버전 | BFCL v2 점수 | Tool Calling | OpenRouter 안정성 | 선택 |
+|------|-------------|--------------|------------------|------|
+| **Llama 3.1 70B** | 0.741 | ✅ 공식 지원 | ✅ 안정적 | ✅ **권장** |
+| Llama 3.2 3B | 0.670 | ❌ 제거됨 | ⚠️ Prompt만 | ❌ |
+| Llama 3.3 70B | 0.773 | ✅ 공식 지원 | ❌ 변환 실패 | ❌ |
+
+#### 📊 근거 (사실 기반)
+
+**1. Llama 3.3 70B (최신, 최고 점수)**
+- ✅ BFCL v2 점수: **0.773 (1위)** ([출처](https://llm-stats.com/benchmarks/bfcl-v2))
+- ✅ 네이티브 tool calling 지원 ([HuggingFace 문서](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct#tool-use-with-transformers))
+- ❌ **치명적 결함**: OpenRouter 변환 시 `arguments='{"'` 잘림
+- ❌ 실제 테스트 성공률: **40-60%** (프로바이더 라우팅 의존)
+
+**2. Llama 3.2 1B/3B (소형 모델)**
+- ⚠️ BFCL v2 점수: 0.670
+- ❌ [Function Calling 버전 제거됨](https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/CHANGELOG.md#L294) (Nov 9, 2024)
+- ❌ Prompt-based만 지원 (chat template)
+- ❌ 크기 대비 성능 부족
+
+**3. Llama 3.1 70B ✅ 선택**
+- ✅ BFCL v2 점수: 0.741 (안정적)
+- ✅ [공식 tool calling 지원](https://www.reddit.com/r/LocalLLaMA/comments/1ea9eeo/) ("official tool calling support")
+- ✅ [OpenRouter 안정 확인](https://openrouter.ai/meta-llama/llama-3.1-70b-instruct)
+- ✅ [BFCL SUPPORTED_MODELS.md 명시](https://github.com/ShishirPatil/gorilla/blob/main/berkeley-function-call-leaderboard/SUPPORTED_MODELS.md#L87)
+- ✅ **실전 검증**: OpenRouter 변환 이슈 없음
+
+#### 🔍 발견한 이슈
+
+**Llama 3.3 OpenRouter 변환 실패:**
+```
+⚠️ Tool call 'calculate_triangle_area' has empty/incomplete arguments: '{"'
+⚠️ Skipping incomplete tool_call 'calculate_triangle_area': arguments='{"'
+❌ (3861ms)
 ```
 
-**원인**: 
-- Llama 3.3은 [네이티브 tool_calls를 지원](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct#tool-use-with-transformers)
-- OpenRouter의 일부 프로바이더가 변환에 실패
-- 성공률: 40-60% (프로바이더 라우팅에 따라 변동)
-
-**권장 해결책**:
-1. **다른 모델 사용** (Qwen, Mistral 권장):
-   ```bash
-   python main.py --model "qwen/qwen3-14b" --quick
-   ```
-
-2. **직접 API 사용** (OpenRouter 우회):
-   - Groq: `https://api.groq.com/openai/v1` ([docs](https://console.groq.com/docs/tool-use))
-   - Together AI: `https://api.together.xyz/v1`
-   - Fireworks: `https://api.fireworks.ai/inference/v1`
-
-3. **Llama 대안**:
-   - 다른 70B 모델: `qwen/qwen-2.5-72b-instruct` (더 안정적)
+**해결 시도:**
+1. ❌ Content 파싱: OpenRouter가 content도 비움
+2. ❌ 복구 전략: JSON 복구 불가능 (원본 데이터 손실)
+3. ✅ **최종 해결**: Llama 3.1 70B 사용
 
 전체 모델 목록: https://openrouter.ai/models
 
