@@ -31,6 +31,8 @@ Berkeley Function Calling Leaderboard (BFCL) 벤치마크를 쉽게 실행할 �
 | **memory** | 155 | Agentic | ⭐⭐⭐ |
 | **format_sensitivity** | 9 | Agentic | ⭐⭐ |
 
+> ⚠️ **주의**: `format_sensitivity`는 메타데이터 파일로, 다른 카테고리의 케이스를 다양한 프롬프트 포맷으로 변형하여 테스트합니다. 독립적인 데이터셋이 아니므로 별도 구현이 필요합니다. (현재 미지원)
+
 ---
 
 ## 🎯 BFCL 공식 평가 방법 준수
@@ -84,9 +86,37 @@ Result: ❌ FAIL (3/3 중 2개만 매칭, 67%)
 - **Relevance**: 최소 1개 호출 = PASS (정확도 체크 안 함)
 - **적용**: `irrelevance`, `live_irrelevance`, `live_relevance`
 
-### 4. Agentic: Exact Match ✅
-- **방법**: 최종 답변에 정답 문자열 포함 여부
-- **적용**: `web_search`, `memory`
+### 4. Agentic: Exact Match with Standardization ✅
+
+**평가 방법**: 최종 텍스트 답변에서 정답 문자열을 찾되, **정규화 및 단어 경계 매칭** 사용
+
+#### Standardization (정규화)
+BFCL v4 공식 `agentic_checker.py`의 표준화 함수를 정확히 복제하여 구두점 차이를 자동 처리:
+
+```python
+# 구두점 제거: ,./\-_*^()  (공백 유지!)
+# 공식 BFCL: regex_string = r"[\,\.\/\-\_\*\^\(\)]"
+"April 1, 2024"  → "april 1 2024"
+"New York"       → "new york"
+"customer-123"   → "customer123"
+"user_name"      → "username"  # 언더스코어도 제거됨
+```
+
+**주의**: 공백을 유지해야 단어 경계 `\b` 정규식이 정상 작동합니다. (공식 BFCL v4 agentic_checker.py와 동일)
+
+#### Word Boundary Matching (단어 경계)
+공식 BFCL v4와 동일하게 정규식 `\b`를 사용하여 부분 매칭 방지:
+
+| Ground Truth | Model Response | 결과 | 이유 |
+|--------------|----------------|------|------|
+| "Michael" | "Michael Jordan" | ✅ PASS | 단어 경계 일치 |
+| "Michael" | "Michaelson" | ❌ FAIL | 부분 문자열 (단어 아님) |
+| "2024" | "In 2024" | ✅ PASS | 단어 경계 일치 |
+
+#### 적용 카테고리
+- `web_search`: 웹 검색 결과에서 정답 추출
+- `memory`: 메모리에 저장된 정보 검색
+- `format_sensitivity`: 다양한 프롬프트 포맷에 대한 일관성
 
 > 📖 상세 구현 문서: [BFCL_IMPLEMENTATION.md](./BFCL_IMPLEMENTATION.md)
 

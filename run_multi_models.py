@@ -12,7 +12,7 @@ from main import run_benchmark, DEFAULT_CONFIG, BFCL_ALL_CATEGORIES
 
 # 테스트할 모델 목록
 MODELS_TO_TEST = [
-    "meta-llama/llama-3.3-70b-instruct",
+    # "meta-llama/llama-3.3-70b-instruct",  # Llama 제외
     "mistralai/mistral-small-3.2-24b-instruct",
     "qwen/qwen3-32b",
     "qwen/qwen3-14b",  # 주의: "Paid model training" 정책 필요. Privacy 설정 확인: https://openrouter.ai/settings/privacy

@@ -92,7 +92,7 @@ BFCL_ALL_CATEGORIES = {
 # ==========================================
 DEFAULT_CONFIG = {
     "model_name": "mistralai/mistral-small-3.2-24b-instruct",  # 유료 모델 (tool calling 지원)
-    "categories": list(BFCL_ALL_CATEGORIES.keys()),  # 전체 카테고리
+    "categories": [k for k in BFCL_ALL_CATEGORIES.keys() if k != "format_sensitivity"],  # format_sensitivity 제외 (19개)
     "samples_per_cat": 5,  # 각 카테고리당 기본 샘플 수
     "sampling_strategy": "equal",  # "equal" or "proportional"
     "max_agent_steps": 3,
@@ -110,7 +110,7 @@ QUICK_TEST_CONFIG = {
 # 전체 벤치마크 설정 (모든 데이터 사용)
 FULL_TEST_CONFIG = {
     "samples_per_cat": 999999,  # 각 카테고리의 모든 샘플 사용
-    "categories": list(BFCL_ALL_CATEGORIES.keys()),  # 전체 20개 카테고리
+    "categories": [k for k in BFCL_ALL_CATEGORIES.keys() if k != "format_sensitivity"],  # format_sensitivity 제외 (19개)
     "sampling_strategy": "equal",
     "rate_limit_delay": 3
 }
@@ -736,6 +736,7 @@ CRITICAL RULES:
 2. NEVER make up or hallucinate function names - only use functions from the tools list
 3. Extract parameter values directly from the user's question
 4. For multi-step tasks, call functions sequentially and use their results
+5. When the user asks about MULTIPLE items/locations/entities, call the same function MULTIPLE TIMES in parallel (one call per item)
 
 PARAMETER EXTRACTION:
 - Read the user's question carefully to extract all required parameter values
@@ -747,6 +748,11 @@ FUNCTION SELECTION:
 - Match the user's intent to the most appropriate function name
 - Check function descriptions to understand their purpose
 - Consider function parameters to ensure you have the required data
+
+PARALLEL CALLS:
+- If the user asks about multiple items (e.g., "weather in Beijing AND Shanghai"), make SEPARATE calls for EACH item
+- Example: "Show me prices for product A and product B" → Call get_price twice: once for A, once for B
+- Each call should be independent and can be executed in parallel
 
 MULTI-TURN BEHAVIOR:
 - Use tool execution results to inform your next function call

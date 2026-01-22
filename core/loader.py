@@ -10,13 +10,29 @@ class BFCLDataLoader:
         data_path = self.data_root / f"BFCL_v4_{category}.json"
         ans_path = self.ans_root / f"BFCL_v4_{category}.json"
         
-        if not data_path.exists() or not ans_path.exists():
+        # Question 파일이 없으면 None 반환
+        if not data_path.exists():
             return None, None
             
+        # Question 파일 로드
         with open(data_path, 'r', encoding='utf-8') as f:
             questions = [json.loads(line) for line in f.readlines()]
             if limit: questions = questions[:limit]
+        
+        # Possible answer 파일이 없는 경우: ground_truth를 question에서 추출
+        # (irrelevance, live_irrelevance, live_relevance, format_sensitivity)
+        if not ans_path.exists():
+            # ground_truth가 question 내부에 있는 경우
+            answers = []
+            for q in questions:
+                if 'ground_truth' in q:
+                    answers.append({'ground_truth': q['ground_truth']})
+                else:
+                    # ground_truth가 없으면 빈 리스트로 가정 (relevance 카테고리)
+                    answers.append({'ground_truth': []})
+            return questions, answers
             
+        # Possible answer 파일이 있는 경우: 정답 로드
         with open(ans_path, 'r', encoding='utf-8') as f:
             answers = [json.loads(line) for line in f.readlines()]
             if limit: answers = answers[:limit]

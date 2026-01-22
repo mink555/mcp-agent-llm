@@ -8,6 +8,20 @@ class BFCLChecker:
     누적된 호출 기록과 최종 텍스트 답변을 모두 검증합니다.
     """
     @staticmethod
+    def _standardize_string(input_string: str) -> str:
+        """
+        BFCL v4 공식 agentic_checker.py의 standardize_string 함수 (정확히 복제)
+        구두점 제거 (,./\-_*^()), 소문자 변환, 공백은 유지
+        예: "April 1, 2024" → "april 1 2024"
+        
+        주의: 공백을 유지해야 단어 경계(\b) 정규식이 작동함!
+        
+        공식 BFCL: regex_string = r"[\,\.\/\-\_\*\^\(\)]"
+        """
+        regex_string = r"[,./\-_*^()]"  # 하이픈 이스케이프 필수!
+        return re.sub(regex_string, "", input_string).lower().replace("'", '"')
+    
+    @staticmethod
     def ast_checker(all_model_calls, ground_truth, last_content="", category=""):
         """
         all_model_calls: 대화 전체에서 발생한 모든 도구 호출 리스트
@@ -34,12 +48,18 @@ class BFCLChecker:
         
         # 3. Agentic (web_search, memory): Exact-match (문자열 정답)
         if isinstance(ground_truth[0], str):
-            # 호출 인자나 마지막 답변 내용 중 정답이 있는지 확인
-            search_space = (str(all_model_calls) + " " + str(last_content)).lower()
+            # BFCL 공식: last_content만 체크 (함수 호출 결과는 무시)
+            standardized_response = BFCLChecker._standardize_string(last_content)
+            
             for gt in ground_truth:
-                if gt.lower() in search_space:
+                standardized_gt = BFCLChecker._standardize_string(gt)
+                # 단어 경계(\b) 사용하여 정확한 단어 매칭
+                # 예: "Michael"은 매칭되지만 "Michaelson"은 매칭 안 됨
+                pattern = rf"\b{re.escape(standardized_gt)}\b"
+                if re.search(pattern, standardized_response):
                     return True, f"✅ Exact Match: '{gt}' found"
-            return False, f"❌ Answer mismatch (Expected: {ground_truth})"
+            
+            return False, f"❌ Answer mismatch (Expected: {ground_truth}, Got: {last_content[:100]}...)"
 
         # 3. AST Match (도구 호출 구조 검증)
         # GT 평탄화
@@ -156,45 +176,52 @@ class BFCLChecker:
     @staticmethod
     def _response_based_checker(all_model_calls, flattened_gt):
         """
-        BFCL 공식 Multi-turn 평가: Response-based evaluation
-        최소 필수 경로 (minimum necessary path) 확인 + 중복 단계 허용
+        BFCL 공식 Multi-turn 평가: Response-based evaluation (정확히 복제)
         
-        GT의 모든 함수 호출이 모델 출력에 포함되는지 확인 (순서 무시, 중복 허용)
+        공식 multi_turn_checker.py의 _is_subsequence_unordered와 동일한 로직:
+        - GT의 각 항목을 모델 출력에서 찾을 때마다 "사용됨" 표시
+        - 중복된 GT 항목은 모델 출력에도 그만큼 있어야 함
+        - 예: GT = [A, A] → Model에 A가 2번 이상 있어야 통과
         """
         if not all_model_calls:
             return False, "❌ No tool calls generated"
         
-        matched_indices = []
+        # 모델 출력의 복사본 (매칭되면 제거하여 중복 처리)
+        model_calls_copy = all_model_calls[:]
         results = []
         all_pass = True
         
         for i, g_call in enumerate(flattened_gt):
             found_match = False
+            matched_index = None
             
-            for j, m_call in enumerate(all_model_calls):
-                # Response-based: 중복 허용 (이미 매칭된 것도 재사용 가능)
+            # 남아있는 모델 호출에서 매칭 찾기
+            for j, m_call in enumerate(model_calls_copy):
                 match_result = BFCLChecker._single_call_checker(m_call, g_call, i)
                 if match_result["valid"]:
-                    matched_indices.append(j)
-                    results.append(f"GT {i}: ✅ Found at Model[{j}]")
                     found_match = True
+                    matched_index = j
+                    results.append(f"GT {i}: ✅ Matched")
                     break
             
-            if not found_match:
+            if found_match:
+                # 매칭된 항목을 제거하여 중복 체크 (BFCL 공식과 동일)
+                model_calls_copy.pop(matched_index)
+            else:
                 all_pass = False
                 # g_call이 문자열인 경우 처리
                 if isinstance(g_call, str):
                     g_func = g_call.split('(')[0] if '(' in g_call else g_call
                 else:
                     g_func = list(g_call.keys())[0] if isinstance(g_call, dict) else str(g_call)
-                results.append(f"GT {i}: ❌ Required call '{g_func}' not found")
+                results.append(f"GT {i}: ❌ Required call '{g_func}' not found in remaining model output")
         
         if all_pass:
-            coverage = len(matched_indices) / len(flattened_gt) * 100
-            extra_calls = len(all_model_calls) - len(set(matched_indices))
-            msg = f"✅ All {len(flattened_gt)} required calls found (Coverage: {coverage:.0f}%)"
+            matched_count = len(flattened_gt)
+            extra_calls = len(model_calls_copy)
+            msg = f"✅ All {matched_count} required calls found"
             if extra_calls > 0:
-                msg += f" + {extra_calls} extra calls (allowed)"
+                msg += f" ({extra_calls} extra calls allowed)"
             return True, msg
         else:
             return False, "\n".join(results)
